@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Logo "Achei a Loja": pino de mapa com uma lojinha (toldo listrado) dentro -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- pino -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,82 C54,82 32,61 32,47 A22,22 0 1,1 76,47 C76,61 54,82 54,82 Z" />
+    <!-- corpo da loja -->
+    <path
+        android:fillColor="#14213D"
+        android:pathData="M44,44 L64,44 L64,58 L44,58 Z" />
+    <!-- porta -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M51,49 L57,49 L57,58 L51,58 Z" />
+    <!-- toldo listrado -->
+    <path
+        android:fillColor="#14213D"
+        android:pathData="M41,36 L46,36 L46,43 A2.5,2.5 0 0,1 41,43 Z" />
+    <path
+        android:fillColor="#FF6A13"
+        android:pathData="M46,36 L51,36 L51,43 A2.5,2.5 0 0,1 46,43 Z" />
+    <path
+        android:fillColor="#14213D"
+        android:pathData="M51,36 L57,36 L57,43 A3,3 0 0,1 51,43 Z" />
+    <path
+        android:fillColor="#FF6A13"
+        android:pathData="M57,36 L62,36 L62,43 A2.5,2.5 0 0,1 57,43 Z" />
+    <path
+        android:fillColor="#14213D"
+        android:pathData="M62,36 L67,36 L67,43 A2.5,2.5 0 0,1 62,43 Z" />
+</vector>

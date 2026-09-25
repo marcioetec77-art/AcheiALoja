@@ -1,0 +1,455 @@
+{
+ "id": "exemplo",
+ "nome": "Shopping Exemplo",
+ "cidade": "Cidade Exemplo - SP",
+ "endereco": "Av. Fictícia, 1000",
+ "observacoes": "Motoboys: use a entrada da doca (Rua B). Proibido entrar de capacete.",
+ "largura": 1000,
+ "altura": 700,
+ "pisos": [
+  {
+   "id": "T",
+   "nome": "Térreo",
+   "formas": [
+    {
+     "tipo": "contorno",
+     "x": 20,
+     "y": 20,
+     "w": 960,
+     "h": 660,
+     "rotulo": ""
+    },
+    {
+     "tipo": "corredor",
+     "x": 20,
+     "y": 300,
+     "w": 960,
+     "h": 80,
+     "rotulo": "Corredor principal"
+    },
+    {
+     "tipo": "corredor",
+     "x": 460,
+     "y": 20,
+     "w": 80,
+     "h": 660,
+     "rotulo": ""
+    }
+   ],
+   "lojas": [
+    {
+     "id": "t1",
+     "nome": "Cafeteria Grão Bom",
+     "categoria": "cafe",
+     "numero": "T-101",
+     "x": 40,
+     "y": 40,
+     "w": 100,
+     "h": 240,
+     "dica": "Balcão de retirada fica à esquerda do caixa"
+    },
+    {
+     "id": "t2",
+     "nome": "Loja de Calçados",
+     "categoria": "outros",
+     "numero": "T-102",
+     "x": 150,
+     "y": 40,
+     "w": 100,
+     "h": 240,
+     "dica": ""
+    },
+    {
+     "id": "t3",
+     "nome": "Padaria Pão Quente",
+     "categoria": "padaria",
+     "numero": "T-103",
+     "x": 260,
+     "y": 40,
+     "w": 100,
+     "h": 240,
+     "dica": ""
+    },
+    {
+     "id": "t4",
+     "nome": "Ótica Visão",
+     "categoria": "outros",
+     "numero": "T-104",
+     "x": 370,
+     "y": 40,
+     "w": 80,
+     "h": 240,
+     "dica": ""
+    },
+    {
+     "id": "t5",
+     "nome": "Farmácia Saúde",
+     "categoria": "outros",
+     "numero": "T-105",
+     "x": 550,
+     "y": 40,
+     "w": 100,
+     "h": 240,
+     "dica": ""
+    },
+    {
+     "id": "t6",
+     "nome": "Açaí da Praia",
+     "categoria": "sobremesa",
+     "numero": "T-106",
+     "x": 660,
+     "y": 40,
+     "w": 100,
+     "h": 240,
+     "dica": "Entrada lateral pelo corredor central"
+    },
+    {
+     "id": "t7",
+     "nome": "Livraria Página",
+     "categoria": "outros",
+     "numero": "T-107",
+     "x": 770,
+     "y": 40,
+     "w": 100,
+     "h": 240,
+     "dica": ""
+    },
+    {
+     "id": "t8",
+     "nome": "Sorveteria Gelato",
+     "categoria": "sobremesa",
+     "numero": "T-108",
+     "x": 880,
+     "y": 40,
+     "w": 80,
+     "h": 240,
+     "dica": ""
+    },
+    {
+     "id": "b1",
+     "nome": "Mercadinho Express",
+     "categoria": "mercado",
+     "numero": "T-110",
+     "x": 40,
+     "y": 400,
+     "w": 100,
+     "h": 260,
+     "dica": "Retirada de delivery nos fundos, porta azul"
+    },
+    {
+     "id": "b2",
+     "nome": "Loja de Roupas",
+     "categoria": "outros",
+     "numero": "T-111",
+     "x": 150,
+     "y": 400,
+     "w": 100,
+     "h": 260,
+     "dica": ""
+    },
+    {
+     "id": "b3",
+     "nome": "Casa do Pão de Queijo",
+     "categoria": "lanches",
+     "numero": "T-112",
+     "x": 260,
+     "y": 400,
+     "w": 100,
+     "h": 260,
+     "dica": ""
+    },
+    {
+     "id": "b4",
+     "nome": "Loja de Celulares",
+     "categoria": "outros",
+     "numero": "T-113",
+     "x": 370,
+     "y": 400,
+     "w": 80,
+     "h": 260,
+     "dica": ""
+    },
+    {
+     "id": "b5",
+     "nome": "Suco Natural",
+     "categoria": "bebidas",
+     "numero": "T-114",
+     "x": 550,
+     "y": 400,
+     "w": 100,
+     "h": 260,
+     "dica": ""
+    },
+    {
+     "id": "b6",
+     "nome": "Brinquedos",
+     "categoria": "outros",
+     "numero": "T-115",
+     "x": 660,
+     "y": 400,
+     "w": 100,
+     "h": 260,
+     "dica": ""
+    },
+    {
+     "id": "b7",
+     "nome": "Chocolates Finos",
+     "categoria": "sobremesa",
+     "numero": "T-116",
+     "x": 770,
+     "y": 400,
+     "w": 100,
+     "h": 260,
+     "dica": ""
+    },
+    {
+     "id": "b8",
+     "nome": "Banco 24h",
+     "categoria": "outros",
+     "numero": "T-117",
+     "x": 880,
+     "y": 400,
+     "w": 80,
+     "h": 260,
+     "dica": ""
+    }
+   ],
+   "pontos": [
+    {
+     "tipo": "entrada_motoboy",
+     "x": 30,
+     "y": 340,
+     "rotulo": "Entrada de motoboys (doca, lado da Rua B)"
+    },
+    {
+     "tipo": "estacionamento",
+     "x": 110,
+     "y": 340,
+     "rotulo": "Estacionamento de motos"
+    },
+    {
+     "tipo": "entrada",
+     "x": 970,
+     "y": 340,
+     "rotulo": "Entrada principal"
+    },
+    {
+     "tipo": "escada",
+     "x": 500,
+     "y": 340,
+     "rotulo": "Escada rolante"
+    },
+    {
+     "tipo": "elevador",
+     "x": 500,
+     "y": 660,
+     "rotulo": "Elevador"
+    },
+    {
+     "tipo": "banheiro",
+     "x": 500,
+     "y": 40,
+     "rotulo": "Banheiros"
+    }
+   ]
+  },
+  {
+   "id": "P2",
+   "nome": "Piso 2",
+   "formas": [
+    {
+     "tipo": "contorno",
+     "x": 20,
+     "y": 20,
+     "w": 960,
+     "h": 660,
+     "rotulo": ""
+    },
+    {
+     "tipo": "corredor",
+     "x": 110,
+     "y": 180,
+     "w": 780,
+     "h": 360,
+     "rotulo": ""
+    },
+    {
+     "tipo": "praca",
+     "x": 300,
+     "y": 200,
+     "w": 400,
+     "h": 320,
+     "rotulo": "Praça de alimentação"
+    },
+    {
+     "tipo": "corredor",
+     "x": 460,
+     "y": 540,
+     "w": 80,
+     "h": 140,
+     "rotulo": ""
+    }
+   ],
+   "lojas": [
+    {
+     "id": "p1",
+     "nome": "Burger da Esquina",
+     "categoria": "lanches",
+     "numero": "P-201",
+     "x": 40,
+     "y": 40,
+     "w": 140,
+     "h": 130,
+     "dica": ""
+    },
+    {
+     "id": "p2",
+     "nome": "Pizzaria Forno a Lenha",
+     "categoria": "pizza",
+     "numero": "P-202",
+     "x": 190,
+     "y": 40,
+     "w": 150,
+     "h": 130,
+     "dica": "Motoboys retiram na janela lateral"
+    },
+    {
+     "id": "p3",
+     "nome": "Temakeria Sakura",
+     "categoria": "japonesa",
+     "numero": "P-203",
+     "x": 350,
+     "y": 40,
+     "w": 150,
+     "h": 130,
+     "dica": ""
+    },
+    {
+     "id": "p4",
+     "nome": "Frango Crocante",
+     "categoria": "lanches",
+     "numero": "P-204",
+     "x": 510,
+     "y": 40,
+     "w": 150,
+     "h": 130,
+     "dica": ""
+    },
+    {
+     "id": "p5",
+     "nome": "Pastelaria do Zé",
+     "categoria": "lanches",
+     "numero": "P-205",
+     "x": 670,
+     "y": 40,
+     "w": 140,
+     "h": 130,
+     "dica": ""
+    },
+    {
+     "id": "p6",
+     "nome": "Tacos Mexicanos",
+     "categoria": "mexicana",
+     "numero": "P-206",
+     "x": 820,
+     "y": 40,
+     "w": 140,
+     "h": 130,
+     "dica": ""
+    },
+    {
+     "id": "p7",
+     "nome": "Comida Caseira da Vó",
+     "categoria": "brasileira",
+     "numero": "P-207",
+     "x": 120,
+     "y": 200,
+     "w": 160,
+     "h": 150,
+     "dica": ""
+    },
+    {
+     "id": "p8",
+     "nome": "Salada & Cia",
+     "categoria": "saudavel",
+     "numero": "P-208",
+     "x": 120,
+     "y": 370,
+     "w": 160,
+     "h": 150,
+     "dica": ""
+    },
+    {
+     "id": "p9",
+     "nome": "Espetinho Gaúcho",
+     "categoria": "churrasco",
+     "numero": "P-209",
+     "x": 720,
+     "y": 200,
+     "w": 160,
+     "h": 150,
+     "dica": ""
+    },
+    {
+     "id": "p10",
+     "nome": "Doce Mania",
+     "categoria": "sobremesa",
+     "numero": "P-210",
+     "x": 720,
+     "y": 370,
+     "w": 160,
+     "h": 150,
+     "dica": "Fica em frente ao balcão de retirada"
+    },
+    {
+     "id": "p11",
+     "nome": "Cinema",
+     "categoria": "outros",
+     "numero": "P-220",
+     "x": 40,
+     "y": 560,
+     "w": 400,
+     "h": 110,
+     "dica": ""
+    },
+    {
+     "id": "p12",
+     "nome": "Academia",
+     "categoria": "outros",
+     "numero": "P-221",
+     "x": 560,
+     "y": 560,
+     "w": 400,
+     "h": 110,
+     "dica": ""
+    }
+   ],
+   "pontos": [
+    {
+     "tipo": "retirada",
+     "x": 500,
+     "y": 470,
+     "rotulo": "Balcão de retirada delivery"
+    },
+    {
+     "tipo": "escada",
+     "x": 500,
+     "y": 575,
+     "rotulo": "Escada rolante"
+    },
+    {
+     "tipo": "elevador",
+     "x": 500,
+     "y": 650,
+     "rotulo": "Elevador"
+    },
+    {
+     "tipo": "banheiro",
+     "x": 900,
+     "y": 360,
+     "rotulo": "Banheiros"
+    }
+   ]
+  }
+ ]
+}
