@@ -2,5 +2,5 @@
 <resources>
     <string name="app_name">Achei a Loja</string>
     <!-- Troque pelo endereço onde a política de privacidade ficar publicada -->
-    <string name="url_privacidade">https://SEU-USUARIO.github.io/AcheiALoja/politica-privacidade.html</string>
+    <string name="url_privacidade">https://marcioetec77-art.github.io/AcheiALoja/politica-privacidade.html</string>
 </resources>
