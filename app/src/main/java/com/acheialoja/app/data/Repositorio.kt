@@ -123,4 +123,43 @@ object Repositorio {
             )
         ).await()
     }
+
+    // ---------- Administrador ----------
+
+    /** É administrador quem tem um documento em admins/{uid} (criado pelo console do Firebase). */
+    suspend fun eAdmin(uid: String): Boolean =
+        db.collection("admins").document(uid).get().await().exists()
+
+    /** Salva o mapa inteiro (todos veem na próxima vez que abrirem o shopping). */
+    suspend fun salvarMapa(mapa: Mapa) {
+        db.collection("shoppings").document(mapa.id).set(
+            mapOf(
+                "nome" to mapa.nome,
+                "cidade" to mapa.cidade,
+                "mapa" to EscritorMapa.escrever(mapa),
+                "atualizadoEm" to Timestamp.now(),
+            ),
+            SetOptions.merge(),
+        ).await()
+    }
+
+    /** Cria um shopping novo com a base retangular e devolve o id. */
+    suspend fun criarShopping(nome: String, cidade: String, pisos: Int): String {
+        val doc = db.collection("shoppings").document()
+        val mapa = EscritorMapa.shoppingBase(doc.id, nome.trim(), cidade.trim(), pisos)
+        doc.set(
+            mapOf(
+                "nome" to mapa.nome,
+                "cidade" to mapa.cidade,
+                "ativo" to true,
+                "mapa" to EscritorMapa.escrever(mapa),
+                "atualizadoEm" to Timestamp.now(),
+            )
+        ).await()
+        return doc.id
+    }
+
+    suspend fun excluirShopping(id: String) {
+        db.collection("shoppings").document(id).delete().await()
+    }
 }

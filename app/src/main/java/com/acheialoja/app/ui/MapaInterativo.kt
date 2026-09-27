@@ -96,9 +96,12 @@ fun MapaInterativo(
     pontoDestacado: Ponto?,
     aoTocarLoja: (Loja?) -> Unit,
     modifier: Modifier = Modifier,
+    /** Modo edição: recebe o ponto tocado em coordenadas do desenho. */
+    aoTocarNoDesenho: ((Float, Float) -> Unit)? = null,
 ) {
     val medidor = rememberTextMeasurer()
     val aoTocar by rememberUpdatedState(aoTocarLoja)
+    val aoTocarEdicao by rememberUpdatedState(aoTocarNoDesenho)
     val pisoAtual by rememberUpdatedState(piso)
 
     val esquema = MaterialTheme.colorScheme
@@ -146,7 +149,9 @@ fun MapaInterativo(
                     onDoubleTap = { p -> estado.transformar(p, Offset.Zero, 2f) },
                     onTap = { p ->
                         val q = estado.paraDesenho(p, mapa)
-                        aoTocar(pisoAtual.lojas.lastOrNull { it.contem(q.x, q.y) })
+                        val edicao = aoTocarEdicao
+                        if (edicao != null) edicao(q.x, q.y)
+                        else aoTocar(pisoAtual.lojas.lastOrNull { it.contem(q.x, q.y) })
                     },
                 )
             }

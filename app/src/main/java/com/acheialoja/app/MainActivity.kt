@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.acheialoja.app.data.Repositorio
 import com.acheialoja.app.ui.TelaConta
 import com.acheialoja.app.ui.TelaLogin
 import com.acheialoja.app.ui.TelaMapa
@@ -81,11 +82,18 @@ private fun App(modoTema: ModoTema, aoMudarTema: (ModoTema) -> Unit) {
         return
     }
 
+    // Administrador: quem tem documento em admins/{uid} no Firestore
+    var admin by remember(u.uid) { mutableStateOf(false) }
+    LaunchedEffect(u.uid) {
+        admin = try { Repositorio.eAdmin(u.uid) } catch (e: Exception) { false }
+    }
+
     BackHandler(enabled = tela != Tela.Lista) { tela = Tela.Lista }
 
     when (val t = tela) {
         Tela.Lista -> TelaShoppings(
             uid = u.uid,
+            admin = admin,
             aoAbrir = { id, exemplo -> tela = Tela.Mapa(id, exemplo) },
             aoAbrirConta = { tela = Tela.Conta },
         )
@@ -99,6 +107,7 @@ private fun App(modoTema: ModoTema, aoMudarTema: (ModoTema) -> Unit) {
             uid = u.uid,
             shoppingId = t.shoppingId,
             exemplo = t.exemplo,
+            admin = admin,
             aoVoltar = { tela = Tela.Lista },
         )
     }

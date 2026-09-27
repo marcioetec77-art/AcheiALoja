@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -45,6 +47,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -61,11 +64,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.acheialoja.app.data.Forma
 import com.acheialoja.app.data.LeitorMapa
+import com.acheialoja.app.data.Piso
 import com.acheialoja.app.data.Loja
 import com.acheialoja.app.data.Mapa
 import com.acheialoja.app.data.Ponto
@@ -83,6 +89,7 @@ fun TelaMapa(
     uid: String,
     shoppingId: String,
     exemplo: Boolean,
+    admin: Boolean,
     aoVoltar: () -> Unit,
 ) {
     val contexto = LocalContext.current
@@ -111,6 +118,21 @@ fun TelaMapa(
     val snackbar = remember { SnackbarHostState() }
     var mostrarReporte by remember { mutableStateOf(false) }
     val escopo = rememberCoroutineScope()
+    var editando by remember { mutableStateOf(false) }
+    var mostrarDados by remember { mutableStateOf(false) }
+    val podeEditar = admin && !exemplo
+
+    /** Aplica uma alteração do administrador e salva no Firebase. */
+    fun alterar(novo: Mapa) {
+        mapa = novo
+        escopo.launch {
+            try {
+                Repositorio.salvarMapa(novo)
+            } catch (e: Exception) {
+                snackbar.showSnackbar("Não salvou: ${traduzirErro(e)}")
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -134,6 +156,15 @@ fun TelaMapa(
                     }
                 },
                 actions = {
+                    if (podeEditar && mapa != null) {
+                        IconButton(onClick = { editando = !editando }) {
+                            Icon(
+                                if (editando) Icons.Filled.Check else Icons.Filled.Edit,
+                                contentDescription = if (editando) "Concluir edição" else "Editar mapa",
+                                tint = if (editando) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
                     if (!exemplo) {
                         IconButton(onClick = { Repositorio.alternarFavorito(uid, shoppingId, !favorito) }) {
                             Icon(
@@ -168,12 +199,36 @@ fun TelaMapa(
                 }
                 m == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 m.pisos.isEmpty() -> Mensagem("Este shopping ainda não tem pisos desenhados.")
-                else -> ConteudoMapa(m)
+                else -> ConteudoMapa(
+                    mapa = m,
+                    editando = editando,
+                    aoAlterar = { alterar(it) },
+                    aoAbrirDados = { mostrarDados = true },
+                    aoConcluirEdicao = { editando = false },
+                )
             }
         }
     }
 
     val m = mapa
+    if (mostrarDados && m != null) {
+        DialogoDadosShopping(
+            mapa = m,
+            aoSalvar = { alterar(it); mostrarDados = false },
+            aoExcluirShopping = {
+                mostrarDados = false
+                escopo.launch {
+                    try {
+                        Repositorio.excluirShopping(m.id)
+                        aoVoltar()
+                    } catch (e: Exception) {
+                        snackbar.showSnackbar("Não excluiu: ${traduzirErro(e)}")
+                    }
+                }
+            },
+            aoFechar = { mostrarDados = false },
+        )
+    }
     if (mostrarReporte && m != null) {
         DialogoReporte(
             aoFechar = { mostrarReporte = false },
@@ -193,7 +248,13 @@ fun TelaMapa(
 }
 
 @Composable
-private fun ConteudoMapa(mapa: Mapa) {
+private fun ConteudoMapa(
+    mapa: Mapa,
+    editando: Boolean,
+    aoAlterar: (Mapa) -> Unit,
+    aoAbrirDados: () -> Unit,
+    aoConcluirEdicao: () -> Unit,
+) {
     val estado = remember(mapa.id) { EstadoMapa() }
     var pisoIdx by remember(mapa.id) { mutableIntStateOf(0) }
     var selecionada by remember(mapa.id) { mutableStateOf<Loja?>(null) }
@@ -201,7 +262,59 @@ private fun ConteudoMapa(mapa: Mapa) {
     var busca by remember(mapa.id) { mutableStateOf("") }
     var mostrarLista by remember(mapa.id) { mutableStateOf(false) }
     var avisoFechado by remember(mapa.id) { mutableStateOf(false) }
-    val piso = mapa.pisos[pisoIdx.coerceIn(0, mapa.pisos.lastIndex)]
+    val idxPiso = pisoIdx.coerceIn(0, mapa.pisos.lastIndex)
+    val piso = mapa.pisos[idxPiso]
+
+    // ----- Modo edição (administrador) -----
+    var alvo by remember(mapa.id) { mutableStateOf<AlvoEdicao?>(null) }
+    var movendo by remember(mapa.id) { mutableStateOf<AlvoEdicao?>(null) }
+    var mostrarAreas by remember(mapa.id) { mutableStateOf(false) }
+    val densidade = LocalDensity.current
+
+    fun alterarPiso(f: (Piso) -> Piso) = aoAlterar(mapa.comPiso(idxPiso, f))
+
+    fun tocarEdicao(x: Float, y: Float) {
+        val m = movendo
+        if (m != null) {
+            movendo = null
+            when (m) {
+                is AlvoEdicao.LojaAlvo -> alterarPiso { p ->
+                    p.copy(lojas = p.lojas.map { if (it.id == m.loja.id) it.copy(x = x - it.w / 2f, y = y - it.h / 2f) else it })
+                }
+                is AlvoEdicao.PontoAlvo -> alterarPiso { p ->
+                    p.copy(pontos = p.pontos.mapIndexed { i, pt -> if (i == m.indice) pt.copy(x = x, y = y) else pt })
+                }
+                is AlvoEdicao.FormaAlvo -> alterarPiso { p ->
+                    p.copy(formas = p.formas.mapIndexed { i, f -> if (i == m.indice) f.copy(x = x - f.w / 2f, y = y - f.h / 2f) else f })
+                }
+                is AlvoEdicao.Adicionar -> Unit
+            }
+            return
+        }
+        val escala = estado.base(mapa) * estado.escala
+        val raio = with(densidade) { 22.dp.toPx() } / escala
+        alvo = acertarEdicao(piso, x, y, raio)
+    }
+
+    fun adicionar(codigo: String, x: Float, y: Float) {
+        alvo = null
+        when {
+            codigo == "loja_comida" -> alvo = AlvoEdicao.LojaAlvo(
+                Loja(novoIdLoja(), "", "lanches", "", "", x - 30f, y - 20f, 60f, 40f), nova = true,
+            )
+            codigo == "loja_outra" -> alvo = AlvoEdicao.LojaAlvo(
+                Loja(novoIdLoja(), "", "outros", "", "", x - 40f, y - 25f, 80f, 50f), nova = true,
+            )
+            codigo.startsWith("area_") -> {
+                val tipo = codigo.removePrefix("area_")
+                val forma = if (tipo == "corredor") Forma(tipo, x - 150f, y - 30f, 300f, 60f, "")
+                else Forma(tipo, x - 110f, y - 80f, 220f, 160f, if (tipo == "praca") "Praça de alimentação" else "")
+                alterarPiso { it.copy(formas = it.formas + forma) }
+                alvo = AlvoEdicao.FormaAlvo(piso.formas.size, forma)
+            }
+            else -> alterarPiso { it.copy(pontos = it.pontos + Ponto(codigo, x, y, nomePonto(codigo))) }
+        }
+    }
 
     // Enquadra o shopping inteiro assim que a área do mapa tiver tamanho
     LaunchedEffect(estado.tamanho) {
@@ -297,6 +410,28 @@ private fun ConteudoMapa(mapa: Mapa) {
             }
         }
 
+        if (editando) {
+            Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        if (movendo != null) "Toque no novo lugar do item"
+                        else "Editando: toque no mapa para adicionar ou alterar",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (movendo != null) {
+                        TextButton(onClick = { movendo = null }) { Text("Cancelar") }
+                    } else {
+                        TextButton(onClick = aoAbrirDados) { Text("Dados") }
+                        TextButton(onClick = aoConcluirEdicao) { Text("Concluir") }
+                    }
+                }
+            }
+        }
+
         Box(
             Modifier
                 .weight(1f)
@@ -312,6 +447,7 @@ private fun ConteudoMapa(mapa: Mapa) {
                     selecionada = loja
                     pontoDestacado = null
                 },
+                aoTocarNoDesenho = if (editando) ({ x: Float, y: Float -> tocarEdicao(x, y) }) else null,
             )
 
             // Botões de zoom
@@ -415,6 +551,57 @@ private fun ConteudoMapa(mapa: Mapa) {
             )
         }
         Legenda(mapa)
+    }
+
+    // Diálogos do modo edição
+    when (val a = alvo) {
+        null -> Unit
+        is AlvoEdicao.Adicionar -> DialogoAdicionar(
+            aoEscolher = { adicionar(it, a.x, a.y) },
+            aoEditarAreas = { alvo = null; mostrarAreas = true },
+            aoFechar = { alvo = null },
+        )
+        is AlvoEdicao.LojaAlvo -> DialogoLoja(
+            loja = a.loja,
+            nova = a.nova,
+            aoSalvar = { nova ->
+                alterarPiso { p ->
+                    if (a.nova) p.copy(lojas = p.lojas + nova)
+                    else p.copy(lojas = p.lojas.map { if (it.id == nova.id) nova else it })
+                }
+                alvo = null
+            },
+            aoExcluir = { alterarPiso { p -> p.copy(lojas = p.lojas.filter { it.id != a.loja.id }) }; alvo = null },
+            aoMover = { movendo = a; alvo = null },
+            aoFechar = { alvo = null },
+        )
+        is AlvoEdicao.PontoAlvo -> DialogoPonto(
+            ponto = a.ponto,
+            aoSalvar = { novo ->
+                alterarPiso { p -> p.copy(pontos = p.pontos.mapIndexed { i, pt -> if (i == a.indice) novo else pt }) }
+                alvo = null
+            },
+            aoExcluir = { alterarPiso { p -> p.copy(pontos = p.pontos.filterIndexed { i, _ -> i != a.indice }) }; alvo = null },
+            aoMover = { movendo = a; alvo = null },
+            aoFechar = { alvo = null },
+        )
+        is AlvoEdicao.FormaAlvo -> DialogoForma(
+            forma = a.forma,
+            aoSalvar = { nova ->
+                alterarPiso { p -> p.copy(formas = p.formas.mapIndexed { i, f -> if (i == a.indice) nova else f }) }
+                alvo = null
+            },
+            aoExcluir = { alterarPiso { p -> p.copy(formas = p.formas.filterIndexed { i, _ -> i != a.indice }) }; alvo = null },
+            aoMover = { movendo = a; alvo = null },
+            aoFechar = { alvo = null },
+        )
+    }
+    if (mostrarAreas) {
+        DialogoListaAreas(
+            piso = piso,
+            aoEscolher = { i -> mostrarAreas = false; alvo = AlvoEdicao.FormaAlvo(i, piso.formas[i]) },
+            aoFechar = { mostrarAreas = false },
+        )
     }
 }
 

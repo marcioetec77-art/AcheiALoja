@@ -143,3 +143,109 @@ fun normalizar(s: String): String =
         .replace(Regex("\\p{Mn}+"), "")
         .lowercase()
         .trim()
+
+// ---------- Gravação e modelos base (usados pelo modo administrador) ----------
+
+/** Categorias que o administrador pode escolher (código, nome). */
+val CATEGORIAS = listOf(
+    "lanches" to "Lanches / fast food",
+    "pizza" to "Pizzaria",
+    "restaurante" to "Restaurante",
+    "brasileira" to "Brasileira",
+    "japonesa" to "Japonesa",
+    "italiana" to "Italiana",
+    "churrasco" to "Churrasco",
+    "mexicana" to "Mexicana",
+    "cafe" to "Café",
+    "padaria" to "Padaria",
+    "sobremesa" to "Doces / sorvete",
+    "bar" to "Bar",
+    "saudavel" to "Saudável",
+    "bebidas" to "Sucos / bebidas",
+    "mercado" to "Mercado",
+    "outros" to "Outra loja (não é comida)",
+)
+
+val TIPOS_PONTO = listOf(
+    "entrada_motoboy", "estacionamento", "retirada", "entrada", "banheiro", "escada", "elevador",
+)
+
+val TIPOS_FORMA = listOf(
+    "praca" to "Praça de alimentação",
+    "corredor" to "Corredor",
+    "bloqueado" to "Área fechada / estacionamento",
+    "contorno" to "Contorno do prédio",
+)
+
+object EscritorMapa {
+
+    fun escrever(m: Mapa): String = JSONObject().apply {
+        put("id", m.id)
+        put("nome", m.nome)
+        put("cidade", m.cidade)
+        put("endereco", m.endereco)
+        put("observacoes", m.observacoes)
+        put("largura", m.largura.toDouble())
+        put("altura", m.altura.toDouble())
+        put("pisos", JSONArray().apply { m.pisos.forEach { put(piso(it)) } })
+    }.toString()
+
+    private fun piso(p: Piso) = JSONObject().apply {
+        put("id", p.id)
+        put("nome", p.nome)
+        put("formas", JSONArray().apply {
+            p.formas.forEach { f ->
+                put(JSONObject().apply {
+                    put("tipo", f.tipo); put("rotulo", f.rotulo)
+                    put("x", r(f.x)); put("y", r(f.y)); put("w", r(f.w)); put("h", r(f.h))
+                })
+            }
+        })
+        put("lojas", JSONArray().apply {
+            p.lojas.forEach { l ->
+                put(JSONObject().apply {
+                    put("id", l.id); put("nome", l.nome); put("categoria", l.categoria)
+                    put("numero", l.numero); put("dica", l.dica)
+                    put("x", r(l.x)); put("y", r(l.y)); put("w", r(l.w)); put("h", r(l.h))
+                })
+            }
+        })
+        put("pontos", JSONArray().apply {
+            p.pontos.forEach { pt ->
+                put(JSONObject().apply {
+                    put("tipo", pt.tipo); put("rotulo", pt.rotulo)
+                    put("x", r(pt.x)); put("y", r(pt.y))
+                })
+            }
+        })
+    }
+
+    private fun r(v: Float): Int = Math.round(v)
+
+    /** Piso vazio retangular: contorno + corredor em cruz. */
+    fun pisoBase(id: String, nome: String) = Piso(
+        id = id,
+        nome = nome,
+        formas = listOf(
+            Forma("contorno", 20f, 20f, 960f, 660f, ""),
+            Forma("corredor", 20f, 310f, 960f, 80f, ""),
+            Forma("corredor", 460f, 20f, 80f, 660f, ""),
+        ),
+        lojas = emptyList(),
+        pontos = listOf(Ponto("entrada", 500f, 675f, "Entrada principal")),
+    )
+
+    /** Shopping novo, retangular, com a quantidade de pisos pedida. */
+    fun shoppingBase(id: String, nome: String, cidade: String, pisos: Int): Mapa = Mapa(
+        id = id,
+        nome = nome,
+        cidade = cidade,
+        endereco = "",
+        observacoes = "",
+        largura = 1000f,
+        altura = 700f,
+        pisos = (1..pisos.coerceIn(1, 6)).map { i ->
+            pisoBase(if (i == 1) "T" else "P$i", if (i == 1) "Térreo" else "Piso $i")
+        },
+    )
+}

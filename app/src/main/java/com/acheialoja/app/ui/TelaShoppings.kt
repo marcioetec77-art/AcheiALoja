@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LocationOn
@@ -23,6 +24,9 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +42,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,11 +53,13 @@ import androidx.compose.ui.unit.dp
 import com.acheialoja.app.data.Repositorio
 import com.acheialoja.app.data.ShoppingResumo
 import com.acheialoja.app.data.normalizar
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelaShoppings(
     uid: String,
+    admin: Boolean,
     aoAbrir: (id: String, exemplo: Boolean) -> Unit,
     aoAbrirConta: () -> Unit,
 ) {
@@ -69,7 +76,42 @@ fun TelaShoppings(
         }
     }
 
+    var novoShopping by remember { mutableStateOf(false) }
+    var criando by remember { mutableStateOf(false) }
+    val escopo = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
+
+    if (novoShopping) {
+        DialogoNovoShopping(
+            aoCriar = { nome, cidade, pisos ->
+                novoShopping = false
+                criando = true
+                escopo.launch {
+                    try {
+                        val id = Repositorio.criarShopping(nome, cidade, pisos)
+                        aoAbrir(id, false)
+                    } catch (e: Exception) {
+                        snackbar.showSnackbar("Não foi possível criar: ${traduzirErro(e)}")
+                    } finally {
+                        criando = false
+                    }
+                }
+            },
+            aoFechar = { novoShopping = false },
+        )
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
+        floatingActionButton = {
+            if (admin) {
+                ExtendedFloatingActionButton(
+                    onClick = { if (!criando) novoShopping = true },
+                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    text = { Text(if (criando) "Criando…" else "Novo shopping") },
+                )
+            }
+        },
         topBar = {
             TopAppBar(
                 title = { Text("Achei a Loja", fontWeight = FontWeight.Bold) },

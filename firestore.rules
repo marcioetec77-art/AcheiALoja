@@ -2,9 +2,22 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Mapas dos shoppings: qualquer usuário logado lê; só você (pelo console) edita.
+    // Administrador = quem tem um documento em admins/{uid}
+    function eAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Mapas dos shoppings: todo usuário logado lê; só administrador cria/edita/exclui.
     match /shoppings/{id} {
       allow read: if request.auth != null;
+      allow write: if eAdmin();
+    }
+
+    // Lista de administradores: cada um só consegue ver o próprio registro.
+    // (Cadastre administradores pelo console do Firebase.)
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
 
@@ -13,13 +26,14 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Sugestões de correção: o usuário cria e pode apagar as próprias (exclusão de conta).
+    // Sugestões de correção: o usuário cria e pode apagar as próprias; o administrador lê todas.
     match /sugestoes/{id} {
       allow create: if request.auth != null
                     && request.resource.data.uid == request.auth.uid
                     && request.resource.data.texto is string
                     && request.resource.data.texto.size() <= 1000;
-      allow read, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow read, delete: if request.auth != null
+                    && (resource.data.uid == request.auth.uid || eAdmin());
       allow update: if false;
     }
   }
