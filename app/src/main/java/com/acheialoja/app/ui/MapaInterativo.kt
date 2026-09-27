@@ -175,28 +175,32 @@ fun MapaInterativo(
             }
         }
 
-        // Lojas
+        // Lojas (comida colorida por tipo; demais lojas em cinza)
         for (l in piso.lojas) {
             val sel = l.id == selecionada?.id
             val canto = pos(l.x, l.y)
             val tam = Size(l.w * s, l.h * s)
-            val preenchimento = when {
-                sel -> Laranja
-                l.eComida -> cores.comida
-                else -> cores.outras
+            val grupo = grupoDaCategoria(l.categoria)
+            if (sel) {
+                val m = 6.dp.toPx()
+                drawRoundRect(
+                    Laranja.copy(alpha = 0.35f), canto - Offset(m, m),
+                    Size(tam.width + 2 * m, tam.height + 2 * m), CornerRadius(8.dp.toPx()),
+                )
             }
+            val preenchimento = grupo?.cor ?: cores.outras
             val borda = when {
-                sel -> LaranjaEscuro
-                l.eComida -> cores.comidaBorda
+                sel -> cores.texto
+                grupo != null -> Color.White.copy(alpha = 0.9f)
                 else -> cores.outrasBorda
             }
             drawRoundRect(preenchimento, canto, tam, raio)
             drawRoundRect(borda, canto, tam, raio, style = if (sel) Stroke(3.dp.toPx()) else linha)
             textoCentral(
                 medidor, l.nome, canto, tam,
-                cor = if (sel) Color.White else if (l.eComida) cores.texto else cores.textoFraco,
-                tamanhoSp = if (l.eComida) 12f else 10f,
-                negrito = l.eComida || sel,
+                cor = if (grupo != null) Color.White else cores.textoFraco,
+                tamanhoSp = if (grupo != null) 12f else 10f,
+                negrito = grupo != null || sel,
             )
         }
 
@@ -214,6 +218,31 @@ private data class CoresMapa(
     val praca: Color, val bloqueado: Color, val comida: Color, val comidaBorda: Color,
     val outras: Color, val outrasBorda: Color, val texto: Color, val textoFraco: Color,
 )
+
+/** Grupos de cores das lojas de comida (mesmas cores do esboço e da legenda). */
+data class GrupoCategoria(val nome: String, val cor: Color)
+
+val GRUPOS_COMIDA = listOf(
+    GrupoCategoria("Lanches", Color(0xFFE07A10)),
+    GrupoCategoria("Pizzaria", Color(0xFFD62828)),
+    GrupoCategoria("Restaurantes", Color(0xFF218C80)),
+    GrupoCategoria("Café / padaria", Color(0xFF8D5B3E)),
+    GrupoCategoria("Doces / sorvete", Color(0xFFC2448A)),
+    GrupoCategoria("Bares", Color(0xFF7B4FD1)),
+    GrupoCategoria("Saudável / sucos", Color(0xFF3E9A42)),
+)
+
+/** null = não é comida (desenhada em cinza). */
+fun grupoDaCategoria(categoria: String): GrupoCategoria? = when (categoria) {
+    "", "outros" -> null
+    "lanches", "mercado" -> GRUPOS_COMIDA[0]
+    "pizza" -> GRUPOS_COMIDA[1]
+    "cafe", "padaria" -> GRUPOS_COMIDA[3]
+    "sobremesa" -> GRUPOS_COMIDA[4]
+    "bar" -> GRUPOS_COMIDA[5]
+    "saudavel", "bebidas" -> GRUPOS_COMIDA[6]
+    else -> GRUPOS_COMIDA[2] // restaurante, italiana, japonesa, brasileira, churrasco, mexicana...
+}
 
 fun corDoPonto(tipo: String): Color = when (tipo) {
     "entrada_motoboy" -> Verde
