@@ -2,6 +2,13 @@ package com.acheialoja.app.ui
 
 import android.content.Intent
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +26,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,11 +45,17 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.acheialoja.app.R
 import com.acheialoja.app.data.Repositorio
+import com.acheialoja.app.ui.theme.ModoTema
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TelaConta(email: String, aoVoltar: () -> Unit) {
+fun TelaConta(
+    email: String,
+    modoTema: ModoTema,
+    aoMudarTema: (ModoTema) -> Unit,
+    aoVoltar: () -> Unit,
+) {
     val contexto = LocalContext.current
     val urlPrivacidade = stringResource(R.string.url_privacidade)
     var confirmarExclusao by remember { mutableStateOf(false) }
@@ -62,10 +76,31 @@ fun TelaConta(email: String, aoVoltar: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .padding(pad)
+                .verticalScroll(rememberScrollState())
                 .padding(20.dp)
         ) {
             Text("Conectado como", style = MaterialTheme.typography.labelMedium)
             Text(email, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(24.dp))
+
+            Text("Aparência", style = MaterialTheme.typography.titleSmall)
+            ModoTema.entries.forEach { modo ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = modo == modoTema,
+                            onClick = { aoMudarTema(modo) },
+                            role = Role.RadioButton,
+                        )
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(selected = modo == modoTema, onClick = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(modo.rotulo, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
             Spacer(Modifier.height(24.dp))
 
             OutlinedButton(onClick = { Repositorio.sair() }, modifier = Modifier.fillMaxWidth()) {
