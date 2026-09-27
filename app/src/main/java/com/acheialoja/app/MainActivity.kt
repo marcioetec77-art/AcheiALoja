@@ -1,10 +1,13 @@
 package com.acheialoja.app
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -16,6 +19,8 @@ import com.acheialoja.app.ui.TelaConta
 import com.acheialoja.app.ui.TelaLogin
 import com.acheialoja.app.ui.TelaMapa
 import com.acheialoja.app.ui.TelaShoppings
+import com.acheialoja.app.ui.theme.ModoTema
+import com.acheialoja.app.ui.theme.PreferenciaTema
 import com.acheialoja.app.ui.theme.TemaAcheiALoja
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
@@ -33,13 +38,33 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            TemaAcheiALoja { App() }
+            var modoTema by remember { mutableStateOf(PreferenciaTema.ler(this)) }
+            val escuro = when (modoTema) {
+                ModoTema.SISTEMA -> isSystemInDarkTheme()
+                ModoTema.CLARO -> false
+                ModoTema.ESCURO -> true
+            }
+            // Ícones da barra de status acompanham o tema escolhido
+            LaunchedEffect(escuro) {
+                val estilo = if (escuro) SystemBarStyle.dark(Color.TRANSPARENT)
+                else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                enableEdgeToEdge(statusBarStyle = estilo, navigationBarStyle = estilo)
+            }
+            TemaAcheiALoja(escuro) {
+                App(
+                    modoTema = modoTema,
+                    aoMudarTema = { novo ->
+                        modoTema = novo
+                        PreferenciaTema.salvar(this, novo)
+                    },
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun App() {
+private fun App(modoTema: ModoTema, aoMudarTema: (ModoTema) -> Unit) {
     var usuario by remember { mutableStateOf(Firebase.auth.currentUser) }
     var tela by remember { mutableStateOf<Tela>(Tela.Lista) }
 
@@ -66,6 +91,8 @@ private fun App() {
         )
         Tela.Conta -> TelaConta(
             email = u.email.orEmpty(),
+            modoTema = modoTema,
+            aoMudarTema = aoMudarTema,
             aoVoltar = { tela = Tela.Lista },
         )
         is Tela.Mapa -> TelaMapa(
