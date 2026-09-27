@@ -121,9 +121,9 @@ fun MapaInterativo(
         textoFraco = Color(0xFF9AA3AF),
     ) else CoresMapa(
         fundo = Color(0xFFEDEBE8),
-        contorno = Color.White,
+        contorno = Color(0xFFF4EEE1),
         borda = Color(0xFF8A8F98),
-        corredor = Color(0xFFF1F1F1),
+        corredor = Color.White,
         praca = Color(0xFFFFF1C7),
         bloqueado = Color(0xFFDADCE0),
         comida = Color(0xFFFFE0CC),
@@ -166,12 +166,17 @@ fun MapaInterativo(
         // Estrutura do prédio
         for (f in piso.formas) {
             val cor = when (f.tipo) {
-                "contorno" -> cores.contorno
+                "contorno", "predio" -> cores.contorno
                 "praca" -> cores.praca
                 "bloqueado" -> cores.bloqueado
                 else -> cores.corredor
             }
-            drawRoundRect(cor, pos(f.x, f.y), Size(f.w * s, f.h * s), raio)
+            if (f.tipo == "predio" || f.tipo == "corredor") {
+                // retângulos encaixados (vindos da planta): sem cantos arredondados e sem frestas
+                drawRect(cor, pos(f.x, f.y), Size(f.w * s + 1f, f.h * s + 1f))
+            } else {
+                drawRoundRect(cor, pos(f.x, f.y), Size(f.w * s, f.h * s), raio)
+            }
             if (f.tipo == "contorno") {
                 drawRoundRect(cores.borda, pos(f.x, f.y), Size(f.w * s, f.h * s), raio, style = Stroke(2.dp.toPx()))
             }

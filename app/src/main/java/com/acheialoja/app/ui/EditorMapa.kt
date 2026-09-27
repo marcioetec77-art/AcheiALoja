@@ -70,7 +70,7 @@ fun acertarEdicao(piso: Piso, x: Float, y: Float, raioPonto: Float): AlvoEdicao 
     piso.lojas.lastOrNull { it.contem(x, y) }
         ?.let { return AlvoEdicao.LojaAlvo(it, nova = false) }
     val dentro = { f: Forma -> x >= f.x && x <= f.x + f.w && y >= f.y && y <= f.y + f.h }
-    piso.formas.withIndex().lastOrNull { (_, f) -> f.tipo != "contorno" && f.tipo != "corredor" && dentro(f) }
+    piso.formas.withIndex().lastOrNull { (_, f) -> f.tipo != "contorno" && f.tipo != "corredor" && f.tipo != "predio" && dentro(f) }
         ?.let { return AlvoEdicao.FormaAlvo(it.index, it.value) }
     return AlvoEdicao.Adicionar(x, y)
 }
