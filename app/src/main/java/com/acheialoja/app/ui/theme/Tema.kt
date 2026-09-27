@@ -1,6 +1,6 @@
 package com.acheialoja.app.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
+import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -39,10 +39,34 @@ private val Escuro = darkColorScheme(
     surface = Color(0xFF111418),
 )
 
+/** Escolha do usuário: seguir o celular, sempre claro ou sempre escuro. */
+enum class ModoTema(val rotulo: String) {
+    SISTEMA("Automático (igual ao celular)"),
+    CLARO("Claro"),
+    ESCURO("Escuro"),
+}
+
+/** Guarda a escolha do tema no próprio celular. */
+object PreferenciaTema {
+    private const val ARQUIVO = "config"
+    private const val CHAVE = "modo_tema"
+
+    fun ler(context: Context): ModoTema {
+        val nome = context.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE)
+            .getString(CHAVE, ModoTema.SISTEMA.name)
+        return ModoTema.entries.firstOrNull { it.name == nome } ?: ModoTema.SISTEMA
+    }
+
+    fun salvar(context: Context, modo: ModoTema) {
+        context.getSharedPreferences(ARQUIVO, Context.MODE_PRIVATE)
+            .edit().putString(CHAVE, modo.name).apply()
+    }
+}
+
 @Composable
-fun TemaAcheiALoja(conteudo: @Composable () -> Unit) {
+fun TemaAcheiALoja(escuro: Boolean, conteudo: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) Escuro else Claro,
+        colorScheme = if (escuro) Escuro else Claro,
         content = conteudo,
     )
 }
