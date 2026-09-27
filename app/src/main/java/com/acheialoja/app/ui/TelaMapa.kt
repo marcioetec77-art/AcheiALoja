@@ -199,6 +199,8 @@ private fun ConteudoMapa(mapa: Mapa) {
     var selecionada by remember(mapa.id) { mutableStateOf<Loja?>(null) }
     var pontoDestacado by remember(mapa.id) { mutableStateOf<Ponto?>(null) }
     var busca by remember(mapa.id) { mutableStateOf("") }
+    var mostrarLista by remember(mapa.id) { mutableStateOf(false) }
+    var avisoFechado by remember(mapa.id) { mutableStateOf(false) }
     val piso = mapa.pisos[pisoIdx.coerceIn(0, mapa.pisos.lastIndex)]
 
     // Enquadra o shopping inteiro assim que a área do mapa tiver tamanho
@@ -211,6 +213,7 @@ private fun ConteudoMapa(mapa: Mapa) {
         selecionada = loja
         pontoDestacado = null
         busca = ""
+        mostrarLista = false
         estado.focar(mapa, loja.x + loja.w / 2f, loja.y + loja.h / 2f)
     }
 
@@ -227,6 +230,7 @@ private fun ConteudoMapa(mapa: Mapa) {
 
     val temEntradaMotoboy = mapa.pisos.any { p -> p.pontos.any { it.tipo == "entrada_motoboy" } }
     val temRetirada = mapa.pisos.any { p -> p.pontos.any { it.tipo == "retirada" } }
+    val temVagasMotos = mapa.pisos.any { p -> p.pontos.any { it.tipo == "estacionamento" } }
 
     Column(Modifier.fillMaxSize()) {
         // Busca de lojas
@@ -255,6 +259,11 @@ private fun ConteudoMapa(mapa: Mapa) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            FilterChip(
+                selected = mostrarLista,
+                onClick = { mostrarLista = !mostrarLista; busca = "" },
+                label = { Text("Lista de lojas") },
+            )
             if (mapa.pisos.size > 1) {
                 mapa.pisos.forEachIndexed { i, p ->
                     FilterChip(
@@ -269,6 +278,13 @@ private fun ConteudoMapa(mapa: Mapa) {
                     onClick = { irParaPonto("entrada_motoboy") },
                     label = { Text("Entrada motoboy") },
                     leadingIcon = { Bolinha("entrada_motoboy") },
+                )
+            }
+            if (temVagasMotos) {
+                AssistChip(
+                    onClick = { irParaPonto("estacionamento") },
+                    label = { Text("Vagas de motos") },
+                    leadingIcon = { Bolinha("estacionamento") },
                 )
             }
             if (temRetirada) {
@@ -318,38 +334,53 @@ private fun ConteudoMapa(mapa: Mapa) {
 
             // Resultados da busca por cima do mapa
             val termo = normalizar(busca)
-            if (termo.isNotEmpty()) {
+            if (termo.isNotEmpty() || mostrarLista) {
                 val resultados = mapa.pisos.withIndex().flatMap { (i, p) ->
                     p.lojas
-                        .filter { normalizar(it.nome + " " + it.numero + " " + nomeCategoria(it.categoria)).contains(termo) }
+                        .filter {
+                            if (termo.isEmpty()) it.eComida
+                            else normalizar(it.nome + " " + it.numero + " " + nomeCategoria(it.categoria)).contains(termo)
+                        }
                         .map { i to it }
-                }.sortedByDescending { it.second.eComida }
+                }.sortedWith(compareByDescending<Pair<Int, Loja>> { it.second.eComida }.thenBy { normalizar(it.second.nome) })
 
                 ElevatedCard(
                     Modifier
                         .align(Alignment.TopCenter)
                         .padding(horizontal = 12.dp)
                         .fillMaxWidth()
-                        .heightIn(max = 320.dp)
+                        .heightIn(max = if (mostrarLista) 440.dp else 320.dp)
                 ) {
                     if (resultados.isEmpty()) {
                         Text("Nenhuma loja encontrada.", Modifier.padding(16.dp))
                     } else {
                         LazyColumn {
                             items(resultados, key = { "${it.first}-${it.second.id}" }) { (i, loja) ->
-                                Column(
+                                Row(
                                     Modifier
                                         .fillMaxWidth()
                                         .clickable { irParaLoja(i, loja) }
-                                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(loja.nome, fontWeight = FontWeight.SemiBold)
-                                    Text(
-                                        listOf(mapa.pisos[i].nome, loja.numero, nomeCategoria(loja.categoria))
-                                            .filter { it.isNotBlank() }.joinToString(" · "),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    Box(
+                                        Modifier
+                                            .size(16.dp)
+                                            .background(
+                                                grupoDaCategoria(loja.categoria)?.cor ?: Color(0xFFB5B9C0),
+                                                MaterialTheme.shapes.extraSmall,
+                                            )
                                     )
+                                    Spacer(Modifier.width(12.dp))
+                                    Column {
+                                        Text(loja.nome, fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            listOf(mapa.pisos[i].nome, loja.numero, nomeCategoria(loja.categoria))
+                                                .filter { it.isNotBlank() }.joinToString(" · "),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                                 HorizontalDivider()
                             }
@@ -377,13 +408,13 @@ private fun ConteudoMapa(mapa: Mapa) {
                 linhas = listOf(piso.nome),
                 aoFechar = { pontoDestacado = null },
             )
-            mapa.observacoes.isNotBlank() -> PainelInfo(
-                titulo = "Aviso do shopping",
+            mapa.observacoes.isNotBlank() && !avisoFechado -> PainelInfo(
+                titulo = "Aviso para motoboys",
                 linhas = listOf(mapa.observacoes),
-                aoFechar = null,
+                aoFechar = { avisoFechado = true },
             )
-            else -> Legenda()
         }
+        Legenda(mapa)
     }
 }
 
@@ -408,7 +439,11 @@ private fun PainelInfo(titulo: String, linhas: List<String>, aoFechar: (() -> Un
 }
 
 @Composable
-private fun Legenda() {
+private fun Legenda(mapa: Mapa) {
+    val lojas = mapa.pisos.flatMap { it.lojas }
+    val grupos = lojas.mapNotNull { grupoDaCategoria(it.categoria) }.toSet()
+    val temOutras = lojas.any { grupoDaCategoria(it.categoria) == null }
+    val tiposPonto = mapa.pisos.flatMap { p -> p.pontos.map { it.tipo } }.distinct()
     Row(
         Modifier
             .fillMaxWidth()
@@ -417,9 +452,9 @@ private fun Legenda() {
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ItemLegenda(cor = Color(0xFFFFB38A), texto = "Comida")
-        ItemLegenda(cor = Color(0xFFD5D7DB), texto = "Outras lojas")
-        listOf("entrada_motoboy", "retirada", "estacionamento", "escada", "elevador").forEach { tipo ->
+        GRUPOS_COMIDA.filter { it in grupos }.forEach { ItemLegenda(cor = it.cor, texto = it.nome) }
+        if (temOutras) ItemLegenda(cor = Color(0xFFB5B9C0), texto = "Outras lojas")
+        tiposPonto.forEach { tipo ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Bolinha(tipo)
                 Spacer(Modifier.width(4.dp))
