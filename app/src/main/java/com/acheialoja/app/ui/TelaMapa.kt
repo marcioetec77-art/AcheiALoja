@@ -307,8 +307,12 @@ private fun ConteudoMapa(
             )
             codigo.startsWith("area_") -> {
                 val tipo = codigo.removePrefix("area_")
-                val forma = if (tipo == "corredor") Forma(tipo, x - 150f, y - 30f, 300f, 60f, "")
-                else Forma(tipo, x - 110f, y - 80f, 220f, 160f, if (tipo == "praca") "Praça de alimentação" else "")
+                val forma = when (tipo) {
+                    "corredor" -> Forma(tipo, x - 150f, y - 30f, 300f, 60f, "")
+                    "rua" -> Forma(tipo, x - 200f, y - 20f, 400f, 40f, "")
+                    "nome_rua" -> Forma(tipo, x - 120f, y - 15f, 240f, 30f, "Nome da rua")
+                    else -> Forma(tipo, x - 110f, y - 80f, 220f, 160f, if (tipo == "praca") "Praça de alimentação" else "")
+                }
                 alterarPiso { it.copy(formas = it.formas + forma) }
                 alvo = AlvoEdicao.FormaAlvo(piso.formas.size, forma)
             }

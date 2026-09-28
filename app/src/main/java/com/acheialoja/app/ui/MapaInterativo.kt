@@ -20,6 +20,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -119,6 +120,9 @@ fun MapaInterativo(
         outrasBorda = Color(0xFF555E6C),
         texto = Color(0xFFE8EAED),
         textoFraco = Color(0xFF9AA3AF),
+        rua = Color(0xFF3A4454),
+        via = Color(0xFF262C35),
+        textoRua = Color(0xFFC9D1DC),
     ) else CoresMapa(
         fundo = Color(0xFFEDEBE8),
         contorno = Color(0xFFF4EEE1),
@@ -132,6 +136,9 @@ fun MapaInterativo(
         outrasBorda = Color(0xFFB5B9C0),
         texto = AzulNoite,
         textoFraco = Color(0xFF6B7280),
+        rua = Color(0xFFA9B8C8),
+        via = Color(0xFFDDE2E9),
+        textoRua = Color(0xFF3B4658),
     )
 
     Canvas(
@@ -170,9 +177,13 @@ fun MapaInterativo(
         fun retangulo(f: com.acheialoja.app.data.Forma, cor: Color, extra: Float = 0f) =
             drawRect(cor, pos(f.x, f.y) - Offset(extra, extra), Size(f.w * s + 1f + 2 * extra, f.h * s + 1f + 2 * extra))
 
+        // 0) ruas em volta (embaixo de tudo)
+        for (f in piso.formas) if (f.tipo == "via") retangulo(f, cores.via)
+        for (f in piso.formas) if (f.tipo == "rua") retangulo(f, cores.rua)
+
         for (f in piso.formas) if (f.tipo == "predio") retangulo(f, cores.borda, espessura)
         for (f in piso.formas) {
-            if (f.tipo == "corredor") continue
+            if (f.tipo == "corredor" || f.tipo in TIPOS_RUA) continue
             val cor = when (f.tipo) {
                 "contorno", "predio" -> cores.contorno
                 "praca" -> cores.praca
@@ -188,7 +199,9 @@ fun MapaInterativo(
         for (f in piso.formas) if (f.tipo == "corredor") retangulo(f, cores.borda, espessura)
         for (f in piso.formas) if (f.tipo == "corredor") retangulo(f, cores.corredor)
         for (f in piso.formas) {
-            if (f.rotulo.isNotBlank() && f.tipo != "corredor" && f.tipo != "predio") {
+            if (f.tipo == "nome_rua") {
+                nomeDeRua(medidor, f.rotulo, pos(f.x, f.y), Size(f.w * s, f.h * s), cores.textoRua)
+            } else if (f.rotulo.isNotBlank() && f.tipo != "corredor" && f.tipo != "predio" && f.tipo !in TIPOS_RUA) {
                 textoCentral(medidor, f.rotulo, pos(f.x, f.y), Size(f.w * s, f.h * s), cores.textoFraco, 12f, italico = true)
             }
         }
@@ -234,7 +247,33 @@ private data class CoresMapa(
     val fundo: Color, val contorno: Color, val borda: Color, val corredor: Color,
     val praca: Color, val bloqueado: Color, val comida: Color, val comidaBorda: Color,
     val outras: Color, val outrasBorda: Color, val texto: Color, val textoFraco: Color,
+    val rua: Color, val via: Color, val textoRua: Color,
 )
+
+/** Tipos de área que são ruas (desenhadas por baixo, sem contorno). */
+val TIPOS_RUA = setOf("rua", "via", "nome_rua")
+
+/** Nome de rua: texto em negrito; fica na vertical quando a área é mais alta que larga. */
+private fun DrawScope.nomeDeRua(medidor: TextMeasurer, texto: String, canto: Offset, tam: Size, cor: Color) {
+    if (texto.isBlank()) return
+    val vertical = tam.height > tam.width
+    val comprimento = if (vertical) tam.height else tam.width
+    if (comprimento < 40f) return
+    val layout = medidor.measure(
+        texto,
+        style = TextStyle(color = cor, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+        overflow = TextOverflow.Ellipsis,
+        maxLines = 1,
+        constraints = Constraints(maxWidth = comprimento.toInt().coerceAtLeast(1)),
+    )
+    val centro = canto + Offset(tam.width / 2f, tam.height / 2f)
+    val topo = centro - Offset(layout.size.width / 2f, layout.size.height / 2f)
+    if (vertical) {
+        rotate(degrees = -90f, pivot = centro) { drawText(layout, topLeft = topo) }
+    } else {
+        drawText(layout, topLeft = topo)
+    }
+}
 
 /** Grupos de cores das lojas de comida (mesmas cores do esboço e da legenda). */
 data class GrupoCategoria(val nome: String, val cor: Color)

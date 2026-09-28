@@ -176,6 +176,9 @@ val TIPOS_FORMA = listOf(
     "bloqueado" to "Área fechada / estacionamento",
     "contorno" to "Contorno do prédio",
     "predio" to "Parte do prédio (planta)",
+    "rua" to "Rua / avenida",
+    "via" to "Rua interna / estacionamento",
+    "nome_rua" to "Nome de rua (texto)",
 )
 
 object EscritorMapa {
