@@ -59,6 +59,8 @@ fun TelaConta(
     val contexto = LocalContext.current
     val urlPrivacidade = stringResource(R.string.url_privacidade)
     var confirmarExclusao by remember { mutableStateOf(false) }
+    var mostrarApoio by remember { mutableStateOf(false) }
+    if (mostrarApoio) DialogoApoio(aoFechar = { mostrarApoio = false })
 
     Scaffold(
         topBar = {
@@ -107,6 +109,9 @@ fun TelaConta(
                 Text("Sair")
             }
             Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = { mostrarApoio = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("❤  Apoie o desenvolvedor (Pix)")
+            }
             TextButton(
                 onClick = {
                     contexto.startActivity(Intent(Intent.ACTION_VIEW, urlPrivacidade.toUri()))
