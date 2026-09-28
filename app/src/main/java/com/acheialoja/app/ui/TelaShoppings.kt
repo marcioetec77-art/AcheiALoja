@@ -77,6 +77,8 @@ fun TelaShoppings(
     }
 
     var novoShopping by remember { mutableStateOf(false) }
+    var mostrarApoio by remember { mutableStateOf(false) }
+    if (mostrarApoio) DialogoApoio(aoFechar = { mostrarApoio = false })
     var criando by remember { mutableStateOf(false) }
     val escopo = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -181,9 +183,13 @@ fun TelaShoppings(
                         item {
                             Spacer(Modifier.height(8.dp))
                             OutlinedButton(
-                                onClick = { aoAbrir("exemplo", true) },
+                                onClick = { mostrarApoio = true },
                                 modifier = Modifier.fillMaxWidth(),
-                            ) { Text("Ver shopping de exemplo") }
+                            ) {
+                                Icon(Icons.Filled.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Apoie o desenvolvedor")
+                            }
                         }
                     }
                 }
