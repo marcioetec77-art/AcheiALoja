@@ -20,6 +20,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
@@ -75,6 +78,18 @@ class EstadoMapa {
         desloc = Offset(tamanho.width / 2f - cx * s, tamanho.height / 2f - cy * s)
     }
 
+    /** Enquadra um retângulo do desenho (ex.: rota inteira) com uma margem. */
+    fun enquadrarArea(m: Mapa, x0: Float, y0: Float, x1: Float, y1: Float) {
+        if (tamanho == IntSize.Zero) return
+        val b = base(m)
+        val margem = 80f
+        val w = (x1 - x0).coerceAtLeast(1f) * b
+        val h = (y1 - y0).coerceAtLeast(1f) * b
+        escala = min((tamanho.width - margem) / w, (tamanho.height - margem) / h).coerceIn(1f, 5f)
+        val s = b * escala
+        desloc = Offset(tamanho.width / 2f - (x0 + x1) / 2f * s, tamanho.height / 2f - (y0 + y1) / 2f * s)
+    }
+
     fun transformar(centro: Offset, pan: Offset, zoom: Float) {
         val nova = (escala * zoom).coerceIn(0.6f, 12f)
         val f = nova / escala
@@ -99,6 +114,8 @@ fun MapaInterativo(
     modifier: Modifier = Modifier,
     /** Modo edição: recebe o ponto tocado em coordenadas do desenho. */
     aoTocarNoDesenho: ((Float, Float) -> Unit)? = null,
+    /** Caminho da entrada de motoboys até a loja escolhida (coordenadas do desenho). */
+    rota: List<Pair<Float, Float>>? = null,
 ) {
     val medidor = rememberTextMeasurer()
     val aoTocar by rememberUpdatedState(aoTocarLoja)
@@ -206,6 +223,22 @@ fun MapaInterativo(
             }
         }
 
+        // Rota até a loja escolhida
+        if (rota != null && rota.size >= 2) {
+            val caminho = Path().apply {
+                val p0 = pos(rota[0].first, rota[0].second)
+                moveTo(p0.x, p0.y)
+                for (k in 1 until rota.size) {
+                    val p = pos(rota[k].first, rota[k].second)
+                    lineTo(p.x, p.y)
+                }
+            }
+            drawPath(caminho, Color.White, style = Stroke(8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawPath(caminho, COR_ROTA, style = Stroke(5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawCircle(COR_ROTA, 7.dp.toPx(), pos(rota[0].first, rota[0].second))
+            drawCircle(Color.White, 3.dp.toPx(), pos(rota[0].first, rota[0].second))
+        }
+
         // Lojas (comida colorida por tipo; demais lojas em cinza)
         for (l in piso.lojas) {
             val sel = l.id == selecionada?.id
@@ -249,6 +282,8 @@ private data class CoresMapa(
     val outras: Color, val outrasBorda: Color, val texto: Color, val textoFraco: Color,
     val rua: Color, val via: Color, val textoRua: Color,
 )
+
+val COR_ROTA = Color(0xFF2F6FDE)
 
 /** Tipos de área que são ruas (desenhadas por baixo, sem contorno). */
 val TIPOS_RUA = setOf("rua", "via", "nome_rua")
