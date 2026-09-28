@@ -109,7 +109,7 @@ fun MapaInterativo(
     val cores = if (escuro) CoresMapa(
         fundo = Color(0xFF0B0D10),
         contorno = Color(0xFF1C2128),
-        borda = Color(0xFF4A5260),
+        borda = Color(0xFFAEB6C2),
         corredor = Color(0xFF2B313B),
         praca = Color(0xFF4A3F1E),
         bloqueado = Color(0xFF232830),
@@ -122,7 +122,7 @@ fun MapaInterativo(
     ) else CoresMapa(
         fundo = Color(0xFFEDEBE8),
         contorno = Color(0xFFF4EEE1),
-        borda = Color(0xFF8A8F98),
+        borda = Color(0xFF1F2328),
         corredor = Color.White,
         praca = Color(0xFFFFF1C7),
         bloqueado = Color(0xFFDADCE0),
@@ -163,24 +163,32 @@ fun MapaInterativo(
         val raio = CornerRadius(3.dp.toPx())
         val linha = Stroke(1.dp.toPx())
 
-        // Estrutura do prédio
+        // Estrutura do prédio, desenhada em camadas para ter contorno só por fora:
+        // 1) sombra/contorno do prédio  2) preenchimento das áreas
+        // 3) contorno dos corredores    4) preenchimento dos corredores
+        val espessura = 1.5f.dp.toPx()
+        fun retangulo(f: com.acheialoja.app.data.Forma, cor: Color, extra: Float = 0f) =
+            drawRect(cor, pos(f.x, f.y) - Offset(extra, extra), Size(f.w * s + 1f + 2 * extra, f.h * s + 1f + 2 * extra))
+
+        for (f in piso.formas) if (f.tipo == "predio") retangulo(f, cores.borda, espessura)
         for (f in piso.formas) {
+            if (f.tipo == "corredor") continue
             val cor = when (f.tipo) {
                 "contorno", "predio" -> cores.contorno
                 "praca" -> cores.praca
-                "bloqueado" -> cores.bloqueado
-                else -> cores.corredor
+                else -> cores.bloqueado
             }
-            if (f.tipo == "predio" || f.tipo == "corredor") {
-                // retângulos encaixados (vindos da planta): sem cantos arredondados e sem frestas
-                drawRect(cor, pos(f.x, f.y), Size(f.w * s + 1f, f.h * s + 1f))
+            if (f.tipo == "predio") {
+                retangulo(f, cor)
             } else {
                 drawRoundRect(cor, pos(f.x, f.y), Size(f.w * s, f.h * s), raio)
+                drawRoundRect(cores.borda, pos(f.x, f.y), Size(f.w * s, f.h * s), raio, style = Stroke(if (f.tipo == "contorno") 2.dp.toPx() else espessura))
             }
-            if (f.tipo == "contorno") {
-                drawRoundRect(cores.borda, pos(f.x, f.y), Size(f.w * s, f.h * s), raio, style = Stroke(2.dp.toPx()))
-            }
-            if (f.rotulo.isNotBlank() && f.tipo != "corredor") {
+        }
+        for (f in piso.formas) if (f.tipo == "corredor") retangulo(f, cores.borda, espessura)
+        for (f in piso.formas) if (f.tipo == "corredor") retangulo(f, cores.corredor)
+        for (f in piso.formas) {
+            if (f.rotulo.isNotBlank() && f.tipo != "corredor" && f.tipo != "predio") {
                 textoCentral(medidor, f.rotulo, pos(f.x, f.y), Size(f.w * s, f.h * s), cores.textoFraco, 12f, italico = true)
             }
         }
@@ -201,11 +209,10 @@ fun MapaInterativo(
             val preenchimento = grupo?.cor ?: cores.outras
             val borda = when {
                 sel -> cores.texto
-                grupo != null -> Color.White.copy(alpha = 0.9f)
-                else -> cores.outrasBorda
+                else -> cores.borda
             }
             drawRoundRect(preenchimento, canto, tam, raio)
-            drawRoundRect(borda, canto, tam, raio, style = if (sel) Stroke(3.dp.toPx()) else linha)
+            drawRoundRect(borda, canto, tam, raio, style = if (sel) Stroke(3.dp.toPx()) else Stroke(espessura))
             textoCentral(
                 medidor, l.nome, canto, tam,
                 cor = if (grupo != null) Color.White else cores.textoFraco,
