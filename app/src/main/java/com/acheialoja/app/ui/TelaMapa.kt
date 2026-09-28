@@ -57,6 +57,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -76,6 +77,8 @@ import com.acheialoja.app.data.Loja
 import com.acheialoja.app.data.Mapa
 import com.acheialoja.app.data.Ponto
 import com.acheialoja.app.data.Repositorio
+import com.acheialoja.app.data.ResultadoRota
+import com.acheialoja.app.data.Rota
 import com.acheialoja.app.data.nomeCategoria
 import com.acheialoja.app.data.nomePonto
 import com.acheialoja.app.data.normalizar
@@ -273,6 +276,21 @@ private fun ConteudoMapa(
 
     fun alterarPiso(f: (Piso) -> Piso) = aoAlterar(mapa.comPiso(idxPiso, f))
 
+    // ----- Rota da entrada de motoboys até a loja escolhida -----
+    val lojaRota = if (editando) null else selecionada
+    val rota by produceState<ResultadoRota?>(null, lojaRota?.id, idxPiso, mapa) {
+        val l = lojaRota
+        value = if (l == null) null else withContext(Dispatchers.Default) {
+            try { Rota.calcular(mapa, idxPiso, l) } catch (e: Exception) { null }
+        }
+    }
+    LaunchedEffect(rota) {
+        val r = rota ?: return@LaunchedEffect
+        val xs = r.pontos.map { it.first }
+        val ys = r.pontos.map { it.second }
+        estado.enquadrarArea(mapa, xs.min(), ys.min(), xs.max(), ys.max())
+    }
+
     fun tocarEdicao(x: Float, y: Float) {
         val m = movendo
         if (m != null) {
@@ -452,6 +470,7 @@ private fun ConteudoMapa(
                     pontoDestacado = null
                 },
                 aoTocarNoDesenho = if (editando) ({ x: Float, y: Float -> tocarEdicao(x, y) }) else null,
+                rota = rota?.pontos,
             )
 
             // Botões de zoom
@@ -540,6 +559,7 @@ private fun ConteudoMapa(
                     listOf(piso.nome, loja.numero.takeIf { it.isNotBlank() }?.let { "Loja $it" }, nomeCategoria(loja.categoria))
                         .filterNotNull().filter { it.isNotBlank() }.joinToString(" · "),
                     loja.dica.takeIf { it.isNotBlank() }?.let { "Dica: $it" },
+                    rota?.let { it.aviso ?: "Linha azul: caminho a partir da entrada de motoboys." },
                 ),
                 aoFechar = { selecionada = null },
             )
