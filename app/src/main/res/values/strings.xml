@@ -3,4 +3,9 @@
     <string name="app_name">Achei a Loja</string>
     <!-- Troque pelo endereço onde a política de privacidade ficar publicada -->
     <string name="url_privacidade">https://marcioetec77-art.github.io/AcheiALoja/politica-privacidade.html</string>
+
+    <!-- Pix para apoio ao desenvolvedor -->
+    <string name="pix_chave">32316b14-1b63-4289-9998-5e9ef7407db5</string>
+    <string name="pix_nome">Marcio Monteiro Albino</string>
+    <string name="pix_cidade">SAO PAULO</string>
 </resources>
