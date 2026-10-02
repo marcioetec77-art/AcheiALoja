@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -85,8 +86,11 @@ fun TelaShoppings(
     val contexto = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
 
+    val minhasPendentes = lista.orEmpty().count { !it.ativo && it.criadoPor == uid }
+
     if (novoShopping) {
         DialogoNovoShopping(
+            sugestao = !admin,
             aoCriar = { nome, cidade, endereco ->
                 novoShopping = false
                 criando = true
@@ -94,7 +98,7 @@ fun TelaShoppings(
                     try {
                         // Procura o endereço; se não achar, abre no centro de São Paulo e o admin arrasta o mapa
                         val (lat, lng) = Repositorio.buscarPosicao(contexto, endereco) ?: (-23.5505 to -46.6333)
-                        val id = Repositorio.criarShopping(nome, cidade, lat, lng)
+                        val id = Repositorio.criarShopping(nome, cidade, lat, lng, sugestao = !admin)
                         aoAbrir(id, false)
                     } catch (e: Exception) {
                         snackbar.showSnackbar("Não foi possível criar: ${traduzirErro(e)}")
@@ -110,13 +114,19 @@ fun TelaShoppings(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
-            if (admin) {
-                ExtendedFloatingActionButton(
-                    onClick = { if (!criando) novoShopping = true },
-                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    text = { Text(if (criando) "Criando…" else "Novo shopping") },
-                )
-            }
+            ExtendedFloatingActionButton(
+                onClick = {
+                    when {
+                        criando -> Unit
+                        !admin && minhasPendentes >= 3 -> escopo.launch {
+                            snackbar.showSnackbar("Você já tem 3 sugestões aguardando aprovação. Aguarde a análise.")
+                        }
+                        else -> novoShopping = true
+                    }
+                },
+                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                text = { Text(if (criando) "Criando…" else if (admin) "Novo shopping" else "Sugerir shopping") },
+            )
         },
         topBar = {
             TopAppBar(
@@ -158,19 +168,40 @@ fun TelaShoppings(
                 }
                 else -> {
                     val termo = normalizar(busca)
-                    val filtrada = atual
+                    // Sugeridos só aparecem para o administrador e para quem sugeriu
+                    val visiveis = atual.filter { it.ativo || admin || it.criadoPor == uid }
+                    val pendentes = if (admin) atual.count { !it.ativo } else 0
+                    val filtrada = visiveis
                         .filter { termo.isEmpty() || normalizar(it.nome + " " + it.cidade).contains(termo) }
-                        .sortedByDescending { it.id in favoritos }
+                        .sortedWith(
+                            compareByDescending<ShoppingResumo> { admin && !it.ativo }
+                                .thenByDescending { it.id in favoritos }
+                        )
 
                     LazyColumn(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
+                        if (pendentes > 0) {
+                            item {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(
+                                        if (pendentes == 1) "🔔 1 shopping sugerido por motoboy aguardando você"
+                                        else "🔔 $pendentes shoppings sugeridos por motoboys aguardando você",
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(14.dp),
+                                    )
+                                }
+                            }
+                        }
                         if (filtrada.isEmpty()) {
                             item {
                                 Mensagem(
-                                    if (atual.isEmpty()) "Nenhum shopping cadastrado ainda."
-                                    else "Nenhum shopping encontrado para \"$busca\"."
+                                    if (visiveis.isEmpty()) "Nenhum shopping cadastrado ainda."
+                                    else "Nenhum shopping encontrado para \"$busca\".\nNão achou? Toque em \"Sugerir shopping\"."
                                 )
                             }
                         }
@@ -226,6 +257,13 @@ private fun CartaoShopping(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(shopping.nome, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                if (!shopping.ativo) {
+                    Text(
+                        "Aguardando aprovação",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 if (shopping.cidade.isNotBlank()) {
                     Text(
                         shopping.cidade,

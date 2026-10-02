@@ -71,6 +71,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.acheialoja.app.data.Item
+import com.acheialoja.app.data.MAX_PONTOS_USUARIO
 import com.acheialoja.app.data.LugaresGoogle
 import com.acheialoja.app.data.Repositorio
 import com.acheialoja.app.data.Rota
@@ -112,6 +113,7 @@ fun TelaMapa(
     var erro by remember { mutableStateOf<String?>(null) }
     var tentativa by remember { mutableIntStateOf(0) }
     val camera = rememberCameraPositionState()
+    var editando by remember { mutableStateOf(false) }
 
     LaunchedEffect(shoppingId, tentativa) {
         erro = null
@@ -119,6 +121,8 @@ fun TelaMapa(
             val s = Repositorio.carregarShopping(shoppingId)
             camera.position = CameraPosition.fromLatLngZoom(LatLng(s.lat, s.lng), s.zoom)
             shopping = s
+            // Motoboy que acabou de sugerir: já abre no modo de marcar a entrada
+            if (!admin && !s.ativo && s.criadoPor == uid && s.itens.isEmpty()) editando = true
         } catch (e: Exception) {
             erro = traduzirErro(e)
         }
@@ -129,7 +133,6 @@ fun TelaMapa(
     val snackbar = remember { SnackbarHostState() }
     var mostrarReporte by remember { mutableStateOf(false) }
     val escopo = rememberCoroutineScope()
-    var editando by remember { mutableStateOf(false) }
     var mostrarDados by remember { mutableStateOf(false) }
 
     /** Aplica uma alteração do administrador e salva no Firebase. */
@@ -166,7 +169,9 @@ fun TelaMapa(
                     }
                 },
                 actions = {
-                    if (admin && shopping != null) {
+                    val atual = shopping
+                    val podeEditar = atual != null && (admin || (!atual.ativo && atual.criadoPor == uid))
+                    if (podeEditar) {
                         IconButton(onClick = { editando = !editando }) {
                             Icon(
                                 if (editando) Icons.Filled.Check else Icons.Filled.Edit,
@@ -190,10 +195,44 @@ fun TelaMapa(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { pad ->
-        Box(
+        Column(
             Modifier
                 .fillMaxSize()
                 .padding(pad)
+        ) {
+        val pendente = shopping?.takeIf { !it.ativo }
+        if (pendente != null) {
+            Surface(color = MaterialTheme.colorScheme.tertiaryContainer, modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        if (admin) "Sugerido por um motoboy. Confira, importe as lojas e aprove."
+                        else "Sua sugestão está aguardando o administrador. Só você vê este shopping por enquanto.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (admin) {
+                        TextButton(onClick = {
+                            escopo.launch {
+                                try {
+                                    Repositorio.aprovarShopping(pendente.id)
+                                    shopping = shopping?.copy(ativo = true, criadoPor = "")
+                                    snackbar.showSnackbar("Aprovado! Agora aparece para todos.")
+                                } catch (e: Exception) {
+                                    snackbar.showSnackbar("Não aprovou: ${traduzirErro(e)}")
+                                }
+                            }
+                        }) { Text("Aprovar") }
+                    }
+                }
+            }
+        }
+        Box(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
         ) {
             val s = shopping
             when {
@@ -214,8 +253,10 @@ fun TelaMapa(
                     aoAbrirDados = { mostrarDados = true },
                     aoConcluirEdicao = { editando = false },
                     aoAviso = { texto -> escopo.launch { snackbar.showSnackbar(texto) } },
+                    limitado = !admin,
                 )
             }
+        }
         }
     }
 
@@ -274,6 +315,8 @@ private fun ConteudoMapa(
     aoAbrirDados: () -> Unit,
     aoConcluirEdicao: () -> Unit,
     aoAviso: (String) -> Unit,
+    /** true = motoboy marcando o shopping que sugeriu: só entradas/vagas, até 3 pontos. */
+    limitado: Boolean = false,
 ) {
     val contexto = LocalContext.current
     val shoppingAtual by rememberUpdatedState(shopping)
@@ -369,6 +412,8 @@ private fun ConteudoMapa(
             aoAlterar(shopping.copy(itens = shopping.itens.map {
                 if (it.id == m.id) it.copy(lat = pos.latitude, lng = pos.longitude) else it
             }))
+        } else if (limitado && shopping.itens.count { !it.eLoja } >= MAX_PONTOS_USUARIO) {
+            aoAviso("Você já marcou $MAX_PONTOS_USUARIO pontos. Toque num ponto para mover ou excluir.")
         } else {
             adicionarEm = pos to nomeSugerido
         }
@@ -499,6 +544,8 @@ private fun ConteudoMapa(
                         when {
                             carregando != null -> carregando
                             movendo != null -> "Toque no novo lugar de \"${movendo!!.titulo}\""
+                            limitado -> "Toque onde fica a entrada ou onde parar a moto " +
+                                "(${shopping.itens.count { !it.eLoja }} de $MAX_PONTOS_USUARIO)"
                             else -> "Toque no mapa para marcar. Piso: ${nivelAtual ?: "todos"}"
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -507,8 +554,10 @@ private fun ConteudoMapa(
                     if (movendo != null) {
                         TextButton(onClick = { movendo = null }) { Text("Cancelar") }
                     } else if (carregando == null) {
-                        TextButton(onClick = { mostrarImportar = true }) { Text("Importar") }
-                        TextButton(onClick = aoAbrirDados) { Text("Dados") }
+                        if (!limitado) {
+                            TextButton(onClick = { mostrarImportar = true }) { Text("Importar") }
+                            TextButton(onClick = aoAbrirDados) { Text("Dados") }
+                        }
                         TextButton(onClick = aoConcluirEdicao) { Text("Concluir") }
                     }
                 }
@@ -561,7 +610,7 @@ private fun ConteudoMapa(
                             title = null,
                             onClick = {
                                 if (editando) {
-                                    if (movendo == null) alvo = item to false
+                                    if (movendo == null && !(limitado && item.eLoja)) alvo = item to false
                                 } else {
                                     focar(item)
                                 }
@@ -710,6 +759,7 @@ private fun ConteudoMapa(
             piso = nivelAtual.orEmpty(),
             aoEscolher = { adicionar(it, pos, nomeSugerido) },
             aoFechar = { adicionarEm = null },
+            apenasPontos = limitado,
         )
     }
     alvo?.let { (a, nova) ->

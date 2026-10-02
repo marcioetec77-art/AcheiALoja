@@ -21,7 +21,8 @@ import java.util.Locale
  * Tudo que fala com o Firebase fica aqui.
  *
  * Estrutura no Firestore:
- *   shoppings/{id}      -> nome, cidade, ativo (bool), dados (texto JSON: posição no Google Maps + marcações)
+ *   shoppings/{id}      -> nome, cidade, ativo (bool), dados (texto JSON: posição no Google Maps + marcações),
+ *                          criadoPor (uid do motoboy que sugeriu; ativo = false até o admin aprovar)
  *   usuarios/{uid}      -> favoritos (lista de ids de shopping)
  *   sugestoes/{auto}    -> uid, shoppingId, texto, criadoEm
  *
@@ -58,6 +59,9 @@ object Repositorio {
 
         val minhas = db.collection("sugestoes").whereEqualTo("uid", user.uid).get().await()
         for (doc in minhas.documents) doc.reference.delete().await()
+        // Shoppings sugeridos que ainda não foram aprovados
+        val sugeridos = db.collection("shoppings").whereEqualTo("criadoPor", user.uid).get().await()
+        for (doc in sugeridos.documents) doc.reference.delete().await()
         db.collection("usuarios").document(user.uid).delete().await()
 
         user.delete().await()
@@ -70,13 +74,15 @@ object Repositorio {
             if (erro != null) {
                 close(erro); return@addSnapshotListener
             }
+            // Inclui os sugeridos (ativo = false); a tela decide quem pode vê-los
             val lista = snap?.documents.orEmpty()
-                .filter { it.getBoolean("ativo") != false }
                 .map {
                     ShoppingResumo(
                         id = it.id,
                         nome = it.getString("nome").orEmpty(),
                         cidade = it.getString("cidade").orEmpty(),
+                        ativo = it.getBoolean("ativo") != false,
+                        criadoPor = it.getString("criadoPor").orEmpty(),
                     )
                 }
                 .sortedBy { normalizar(it.nome) }
@@ -93,6 +99,9 @@ object Repositorio {
             nome = doc.getString("nome").orEmpty(),
             cidade = doc.getString("cidade").orEmpty(),
             texto = doc.getString("dados"),
+        ).copy(
+            ativo = doc.getBoolean("ativo") != false,
+            criadoPor = doc.getString("criadoPor").orEmpty(),
         )
     }
 
@@ -163,20 +172,35 @@ object Repositorio {
             }
         }
 
-    /** Cria um shopping novo (sem marcações) na posição informada e devolve o id. */
-    suspend fun criarShopping(nome: String, cidade: String, lat: Double, lng: Double): String {
+    /**
+     * Cria um shopping novo (sem marcações) na posição informada e devolve o id.
+     * sugestao = true: criado por um motoboy; fica escondido até o administrador aprovar.
+     */
+    suspend fun criarShopping(nome: String, cidade: String, lat: Double, lng: Double, sugestao: Boolean): String {
+        val uid = auth.currentUser?.uid ?: error("Faça login novamente.")
         val doc = db.collection("shoppings").document()
         val s = Shopping(doc.id, nome.trim(), cidade.trim(), "", lat, lng, 18f, emptyList())
-        doc.set(
-            mapOf(
-                "nome" to s.nome,
-                "cidade" to s.cidade,
-                "ativo" to true,
-                "dados" to DadosShopping.escrever(s),
-                "atualizadoEm" to Timestamp.now(),
-            )
-        ).await()
+        val dados = mutableMapOf<String, Any>(
+            "nome" to s.nome,
+            "cidade" to s.cidade,
+            "ativo" to !sugestao,
+            "dados" to DadosShopping.escrever(s),
+            "atualizadoEm" to Timestamp.now(),
+        )
+        if (sugestao) {
+            dados["criadoPor"] = uid
+            dados["criadoEm"] = Timestamp.now()
+        }
+        doc.set(dados).await()
         return doc.id
+    }
+
+    /** Administrador: libera um shopping sugerido para todos verem. */
+    suspend fun aprovarShopping(id: String) {
+        db.collection("shoppings").document(id).update(
+            // Ao aprovar, o shopping deixa de ter "dono" (não guardamos quem sugeriu)
+            mapOf("ativo" to true, "aprovadoEm" to Timestamp.now(), "criadoPor" to FieldValue.delete())
+        ).await()
     }
 
     suspend fun excluirShopping(id: String) {

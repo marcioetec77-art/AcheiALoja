@@ -3,11 +3,21 @@ package com.acheialoja.app.data
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** Máximo de pontos (entrada/vagas) que um motoboy pode marcar num shopping que ele sugeriu. */
+const val MAX_PONTOS_USUARIO = 3
+
+/** Pontos que o motoboy pode marcar ao sugerir um shopping. */
+val TIPOS_PONTO_USUARIO = listOf("entrada_motoboy", "estacionamento", "entrada")
+
 /** Item da lista de shoppings. */
 data class ShoppingResumo(
     val id: String,
     val nome: String,
     val cidade: String,
+    /** false = sugerido por um motoboy e ainda não aprovado pelo administrador. */
+    val ativo: Boolean = true,
+    /** uid de quem sugeriu (vazio nos criados pelo administrador). */
+    val criadoPor: String = "",
 )
 
 /**
@@ -23,6 +33,8 @@ data class Shopping(
     val lng: Double,
     val zoom: Float,
     val itens: List<Item>,
+    val ativo: Boolean = true,
+    val criadoPor: String = "",
 )
 
 /**

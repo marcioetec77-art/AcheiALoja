@@ -39,7 +39,9 @@ import androidx.compose.ui.unit.dp
 import com.acheialoja.app.data.CATEGORIAS
 import com.acheialoja.app.data.Item
 import com.acheialoja.app.data.Shopping
+import com.acheialoja.app.data.MAX_PONTOS_USUARIO
 import com.acheialoja.app.data.TIPOS_PONTO
+import com.acheialoja.app.data.TIPOS_PONTO_USUARIO
 import com.acheialoja.app.data.nomePonto
 
 /** Posição atual da câmera do mapa (para gravar como posição inicial do shopping). */
@@ -47,7 +49,12 @@ data class Enquadramento(val lat: Double, val lng: Double, val zoom: Float)
 
 /** Menu que aparece quando o administrador toca num lugar vazio do mapa. */
 @Composable
-fun DialogoAdicionar(piso: String, aoEscolher: (String) -> Unit, aoFechar: () -> Unit) {
+fun DialogoAdicionar(
+    piso: String,
+    aoEscolher: (String) -> Unit,
+    aoFechar: () -> Unit,
+    apenasPontos: Boolean = false,
+) {
     AlertDialog(
         onDismissRequest = aoFechar,
         title = { Text("Adicionar aqui") },
@@ -60,10 +67,12 @@ fun DialogoAdicionar(piso: String, aoEscolher: (String) -> Unit, aoFechar: () ->
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
-                OpcaoAdicionar(GRUPOS_COMIDA[0].cor, false, "", "Loja de comida") { aoEscolher("loja_comida") }
-                OpcaoAdicionar(COR_OUTRAS_LOJAS, false, "", "Outra loja (referência)") { aoEscolher("loja_outra") }
-                HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                TIPOS_PONTO.forEach { tipo ->
+                if (!apenasPontos) {
+                    OpcaoAdicionar(GRUPOS_COMIDA[0].cor, false, "", "Loja de comida") { aoEscolher("loja_comida") }
+                    OpcaoAdicionar(COR_OUTRAS_LOJAS, false, "", "Outra loja (referência)") { aoEscolher("loja_outra") }
+                    HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                }
+                (if (apenasPontos) TIPOS_PONTO_USUARIO else TIPOS_PONTO).forEach { tipo ->
                     OpcaoAdicionar(corDoPonto(tipo), true, letraDoPonto(tipo), nomePonto(tipo)) { aoEscolher(tipo) }
                 }
             }
@@ -248,20 +257,30 @@ fun DialogoDadosShopping(
 }
 
 @Composable
-fun DialogoNovoShopping(aoCriar: (nome: String, cidade: String, busca: String) -> Unit, aoFechar: () -> Unit) {
+fun DialogoNovoShopping(
+    sugestao: Boolean,
+    aoCriar: (nome: String, cidade: String, busca: String) -> Unit,
+    aoFechar: () -> Unit,
+) {
     var nome by remember { mutableStateOf("") }
     var cidade by remember { mutableStateOf("São Paulo - SP") }
     var busca by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = aoFechar,
-        title = { Text("Novo shopping") },
+        title = { Text(if (sugestao) "Sugerir shopping" else "Novo shopping") },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "O shopping abre no Google Maps. Depois é só tocar no mapa para marcar a entrada de motoboys e as lojas.",
+                    if (sugestao) {
+                        "O shopping abre no Google Maps. Toque no mapa para marcar a entrada de motoboys e onde dá " +
+                            "para parar a moto (até $MAX_PONTOS_USUARIO pontos). Depois o administrador confere, " +
+                            "coloca as lojas e libera para todos."
+                    } else {
+                        "O shopping abre no Google Maps. Depois é só tocar no mapa para marcar a entrada de motoboys e as lojas."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 OutlinedTextField(nome, { nome = it }, label = { Text("Nome do shopping") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -277,7 +296,7 @@ fun DialogoNovoShopping(aoCriar: (nome: String, cidade: String, busca: String) -
         confirmButton = {
             TextButton(enabled = nome.isNotBlank(), onClick = {
                 aoCriar(nome.trim(), cidade.trim(), busca.trim().ifBlank { "${nome.trim()}, ${cidade.trim()}" })
-            }) { Text("Criar") }
+            }) { Text(if (sugestao) "Enviar" else "Criar") }
         },
         dismissButton = { TextButton(onClick = aoFechar) { Text("Cancelar") } },
     )
