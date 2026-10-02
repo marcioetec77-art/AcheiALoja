@@ -58,6 +58,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +71,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.acheialoja.app.data.Item
+import com.acheialoja.app.data.LugaresGoogle
 import com.acheialoja.app.data.Repositorio
 import com.acheialoja.app.data.Rota
 import com.acheialoja.app.data.Shopping
@@ -211,6 +213,7 @@ fun TelaMapa(
                     aoAlterar = { alterar(it) },
                     aoAbrirDados = { mostrarDados = true },
                     aoConcluirEdicao = { editando = false },
+                    aoAviso = { texto -> escopo.launch { snackbar.showSnackbar(texto) } },
                 )
             }
         }
@@ -270,8 +273,12 @@ private fun ConteudoMapa(
     aoAlterar: (Shopping) -> Unit,
     aoAbrirDados: () -> Unit,
     aoConcluirEdicao: () -> Unit,
+    aoAviso: (String) -> Unit,
 ) {
     val contexto = LocalContext.current
+    val shoppingAtual by rememberUpdatedState(shopping)
+    var mostrarImportar by remember { mutableStateOf(false) }
+    var importando by remember { mutableStateOf<String?>(null) }
     val escopo = rememberCoroutineScope()
     val densidade = LocalDensity.current.density
 
@@ -380,6 +387,46 @@ private fun ConteudoMapa(
         }
     }
 
+    /** Busca as lojas de comida do Google na área que está aparecendo na tela. */
+    fun importar() {
+        val limites = camera.projection?.visibleRegion?.latLngBounds
+        if (limites == null) {
+            aoAviso("Espere o mapa carregar e tente de novo.")
+            return
+        }
+        importando = "Buscando lojas no Google…"
+        escopo.launch {
+            try {
+                val lugares = LugaresGoogle.buscarComida(
+                    contexto,
+                    limites.southwest.latitude, limites.southwest.longitude,
+                    limites.northeast.latitude, limites.northeast.longitude,
+                ) { feitos, total -> importando = "Buscando lojas no Google… $feitos de $total" }
+                val atual = shoppingAtual
+                val novos = lugares
+                    .filter { !LugaresGoogle.jaExiste(it, atual.itens) }
+                    .map {
+                        Item(
+                            id = "g_" + it.id, tipo = "loja", nome = it.nome, categoria = it.categoria,
+                            numero = "", dica = "", lat = it.lat, lng = it.lng, piso = "",
+                        )
+                    }
+                if (novos.isNotEmpty()) aoAlterar(atual.copy(itens = atual.itens + novos))
+                aoAviso(
+                    when {
+                        lugares.isEmpty() -> "Nenhuma loja de comida encontrada nesta área."
+                        novos.isEmpty() -> "As ${lugares.size} lojas encontradas já estavam marcadas."
+                        else -> "${novos.size} lojas importadas! Toque em cada uma para conferir o piso."
+                    }
+                )
+            } catch (e: Exception) {
+                aoAviso(e.message ?: "Não foi possível buscar no Google.")
+            } finally {
+                importando = null
+            }
+        }
+    }
+
     fun primeiroDoTipo(tipo: String): Item? {
         val todos = shopping.itens.filter { it.tipo == tipo }
         return todos.firstOrNull { nivelAtual != null && mesmoPiso(it.piso, nivelAtual!!) } ?: todos.firstOrNull()
@@ -443,15 +490,24 @@ private fun ConteudoMapa(
                     Modifier.padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    val carregando = importando
+                    if (carregando != null) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                    }
                     Text(
-                        if (movendo != null) "Toque no novo lugar de \"${movendo!!.titulo}\""
-                        else "Toque no mapa (ou no nome de uma loja do Google) para marcar. Piso: ${nivelAtual ?: "todos"}",
+                        when {
+                            carregando != null -> carregando
+                            movendo != null -> "Toque no novo lugar de \"${movendo!!.titulo}\""
+                            else -> "Toque no mapa para marcar. Piso: ${nivelAtual ?: "todos"}"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.weight(1f),
                     )
                     if (movendo != null) {
                         TextButton(onClick = { movendo = null }) { Text("Cancelar") }
-                    } else {
+                    } else if (carregando == null) {
+                        TextButton(onClick = { mostrarImportar = true }) { Text("Importar") }
                         TextButton(onClick = aoAbrirDados) { Text("Dados") }
                         TextButton(onClick = aoConcluirEdicao) { Text("Concluir") }
                     }
@@ -632,6 +688,23 @@ private fun ConteudoMapa(
     }
 
     // Diálogos do modo edição
+    if (mostrarImportar) {
+        AlertDialog(
+            onDismissRequest = { mostrarImportar = false },
+            title = { Text("Importar lojas do Google") },
+            text = {
+                Text(
+                    "Deixe o shopping inteiro aparecendo na tela, de preferência sem as ruas em volta. " +
+                        "Vou buscar lanchonetes, restaurantes, cafés, padarias e sorveterias dessa área e marcar no mapa " +
+                        "com o nome e a cor certa.\n\nO Google não informa o piso: depois toque em cada loja para conferir."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { mostrarImportar = false; importar() }) { Text("Importar") }
+            },
+            dismissButton = { TextButton(onClick = { mostrarImportar = false }) { Text("Cancelar") } },
+        )
+    }
     adicionarEm?.let { (pos, nomeSugerido) ->
         DialogoAdicionar(
             piso = nivelAtual.orEmpty(),
