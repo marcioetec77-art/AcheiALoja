@@ -90,6 +90,9 @@ object Pix {
     }
 }
 
+/** Nome que aparece como desenvolvedor do app. */
+const val DESENVOLVEDOR = "Marcio Monteiro Albino"
+
 /** Janela "Apoie o desenvolvedor" com QR Code do Pix e botão de copiar. */
 @Composable
 fun DialogoApoio(aoFechar: () -> Unit) {
@@ -113,6 +116,12 @@ fun DialogoApoio(aoFechar: () -> Unit) {
                 Text(
                     "O app é gratuito. Se ele te ajuda nas entregas, você pode contribuir com qualquer valor " +
                         "para as atualizações e a manutenção.",
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    "Desenvolvedor: $DESENVOLVEDOR",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center,
                 )
                 if (qr != null) {

@@ -40,7 +40,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.acheialoja.app.R
@@ -137,6 +139,27 @@ fun TelaConta(
                 ),
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Excluir minha conta") }
+
+            Spacer(Modifier.height(32.dp))
+            val versao = remember {
+                runCatching { contexto.packageManager.getPackageInfo(contexto.packageName, 0).versionName }
+                    .getOrNull().orEmpty()
+            }
+            Text(
+                "Achei a Loja" + (if (versao.isNotBlank()) " · versão $versao" else ""),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "Desenvolvido por $DESENVOLVEDOR",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 
