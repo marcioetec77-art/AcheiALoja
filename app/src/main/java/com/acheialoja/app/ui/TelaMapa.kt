@@ -591,7 +591,13 @@ private fun ConteudoMapa(
                 MapEffect(Unit) { mapa -> mapaGoogle = mapa }
                 val icones = remember(densidade) { IconesMapa(densidade) }
 
-                shopping.itens.forEach { item ->
+                // Modo foco: com uma loja escolhida, só aparecem ela e o ponto de partida da linha azul.
+                // Tocar no mapa ou fechar o painel da loja volta a mostrar tudo.
+                val focoLoja = selecionado?.takeIf { it.eLoja && !editando }
+                val visiveis = if (focoLoja == null) shopping.itens
+                else shopping.itens.filter { it.id == focoLoja.id || it.id == rota?.origem?.id }
+
+                visiveis.forEach { item ->
                     key(item.id, item.lat, item.lng) {
                         val estado = remember { MarkerState(LatLng(item.lat, item.lng)) }
                         val destaque = item.id == selecionadoId || item.id == movendo?.id
@@ -706,6 +712,7 @@ private fun ConteudoMapa(
                     ).filterNotNull().joinToString(" · "),
                     item.dica.takeIf { it.isNotBlank() }?.let { "Dica: $it" },
                     rota?.aviso ?: "A entrada de motoboys deste shopping ainda não foi marcada.",
+                    "Para ver as outras lojas, toque no ✕ ou no mapa.",
                 ),
                 acao = rota?.let { r -> "Ir de moto até a entrada" to { abrirNavegacao(r.origem.lat, r.origem.lng) } },
                 aoFechar = { selecionadoId = null },
