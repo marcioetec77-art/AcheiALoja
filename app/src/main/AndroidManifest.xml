@@ -11,6 +11,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AcheiALoja">
 
+        <!-- Chave do Google Maps (preenchida na hora de gerar o app) -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

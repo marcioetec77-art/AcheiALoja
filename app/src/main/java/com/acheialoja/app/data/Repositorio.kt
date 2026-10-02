@@ -1,5 +1,7 @@
 package com.acheialoja.app.data
 
+import android.content.Context
+import android.location.Geocoder
 import com.google.firebase.Firebase
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.EmailAuthProvider
@@ -10,18 +12,22 @@ import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import java.util.Locale
 
 /**
  * Tudo que fala com o Firebase fica aqui.
  *
  * Estrutura no Firestore:
- *   shoppings/{id}      -> nome, cidade, ativo (bool), mapa (texto JSON gerado pelo editor)
+ *   shoppings/{id}      -> nome, cidade, ativo (bool), dados (texto JSON: posição no Google Maps + marcações)
  *   usuarios/{uid}      -> favoritos (lista de ids de shopping)
  *   sugestoes/{auto}    -> uid, shoppingId, texto, criadoEm
  *
  * O Firestore guarda uma cópia local automaticamente, então o app continua
- * funcionando sem internet depois que o mapa foi aberto uma vez.
+ * funcionando sem internet depois que o shopping foi aberto uma vez
+ * (o desenho do Google Maps precisa de internet).
  */
 object Repositorio {
 
@@ -79,16 +85,14 @@ object Repositorio {
         awaitClose { reg.remove() }
     }
 
-    suspend fun carregarMapa(id: String): Mapa {
+    suspend fun carregarShopping(id: String): Shopping {
         val doc = db.collection("shoppings").document(id).get().await()
-        val texto = doc.getString("mapa")
-            ?: error("Este shopping ainda não tem mapa cadastrado.")
-        val mapa = LeitorMapa.ler(texto, idPadrao = id)
-        // Nome/cidade do documento têm prioridade (facilita corrigir pelo console)
-        return mapa.copy(
+        if (!doc.exists()) error("Este shopping não foi encontrado.")
+        return DadosShopping.ler(
             id = id,
-            nome = doc.getString("nome") ?: mapa.nome,
-            cidade = doc.getString("cidade") ?: mapa.cidade,
+            nome = doc.getString("nome").orEmpty(),
+            cidade = doc.getString("cidade").orEmpty(),
+            texto = doc.getString("dados"),
         )
     }
 
@@ -130,29 +134,45 @@ object Repositorio {
     suspend fun eAdmin(uid: String): Boolean =
         db.collection("admins").document(uid).get().await().exists()
 
-    /** Salva o mapa inteiro (todos veem na próxima vez que abrirem o shopping). */
-    suspend fun salvarMapa(mapa: Mapa) {
-        db.collection("shoppings").document(mapa.id).set(
+    /** Salva o shopping inteiro (todos veem na próxima vez que abrirem). */
+    suspend fun salvarShopping(s: Shopping) {
+        db.collection("shoppings").document(s.id).set(
             mapOf(
-                "nome" to mapa.nome,
-                "cidade" to mapa.cidade,
-                "mapa" to EscritorMapa.escrever(mapa),
+                "nome" to s.nome,
+                "cidade" to s.cidade,
+                "dados" to DadosShopping.escrever(s),
                 "atualizadoEm" to Timestamp.now(),
             ),
             SetOptions.merge(),
         ).await()
     }
 
-    /** Cria um shopping novo com a base retangular e devolve o id. */
-    suspend fun criarShopping(nome: String, cidade: String, pisos: Int): String {
+    /**
+     * Procura um endereço/nome de lugar e devolve a posição (usa o Geocoder do próprio Android,
+     * sem custo). Devolve null se não achar.
+     */
+    suspend fun buscarPosicao(contexto: Context, texto: String): Pair<Double, Double>? =
+        withContext(Dispatchers.IO) {
+            if (texto.isBlank() || !Geocoder.isPresent()) return@withContext null
+            try {
+                @Suppress("DEPRECATION")
+                val r = Geocoder(contexto, Locale("pt", "BR")).getFromLocationName(texto, 1)
+                r?.firstOrNull()?.let { it.latitude to it.longitude }
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+    /** Cria um shopping novo (sem marcações) na posição informada e devolve o id. */
+    suspend fun criarShopping(nome: String, cidade: String, lat: Double, lng: Double): String {
         val doc = db.collection("shoppings").document()
-        val mapa = EscritorMapa.shoppingBase(doc.id, nome.trim(), cidade.trim(), pisos)
+        val s = Shopping(doc.id, nome.trim(), cidade.trim(), "", lat, lng, 18f, emptyList())
         doc.set(
             mapOf(
-                "nome" to mapa.nome,
-                "cidade" to mapa.cidade,
+                "nome" to s.nome,
+                "cidade" to s.cidade,
                 "ativo" to true,
-                "mapa" to EscritorMapa.escrever(mapa),
+                "dados" to DadosShopping.escrever(s),
                 "atualizadoEm" to Timestamp.now(),
             )
         ).await()

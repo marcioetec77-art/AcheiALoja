@@ -25,7 +25,9 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
-        versionName = "1.0.0"
+        versionName = "1.1.0"
+        // Chave do Google Maps: vem do segredo MAPS_API_KEY (GitHub) ou de keystore.properties (local)
+        manifestPlaceholders["MAPS_API_KEY"] = segredo("mapsApiKey", "MAPS_API_KEY") ?: ""
     }
 
     signingConfigs {
@@ -86,6 +88,10 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+
+    // Google Maps dentro do app
+    implementation("com.google.maps.android:maps-compose:6.4.1")
+    implementation("com.google.android.gms:play-services-maps:19.0.0")
 
     // QR Code do Pix (apoio ao desenvolvedor)
     implementation("com.google.zxing:core:3.5.3")

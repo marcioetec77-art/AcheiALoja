@@ -47,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -81,16 +82,19 @@ fun TelaShoppings(
     if (mostrarApoio) DialogoApoio(aoFechar = { mostrarApoio = false })
     var criando by remember { mutableStateOf(false) }
     val escopo = rememberCoroutineScope()
+    val contexto = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
 
     if (novoShopping) {
         DialogoNovoShopping(
-            aoCriar = { nome, cidade, pisos ->
+            aoCriar = { nome, cidade, endereco ->
                 novoShopping = false
                 criando = true
                 escopo.launch {
                     try {
-                        val id = Repositorio.criarShopping(nome, cidade, pisos)
+                        // Procura o endereço; se não achar, abre no centro de São Paulo e o admin arrasta o mapa
+                        val (lat, lng) = Repositorio.buscarPosicao(contexto, endereco) ?: (-23.5505 to -46.6333)
+                        val id = Repositorio.criarShopping(nome, cidade, lat, lng)
                         aoAbrir(id, false)
                     } catch (e: Exception) {
                         snackbar.showSnackbar("Não foi possível criar: ${traduzirErro(e)}")

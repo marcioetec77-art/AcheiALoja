@@ -1,5 +1,6 @@
 package com.acheialoja.app.ui
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -20,18 +21,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,7 +43,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -55,62 +53,70 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.acheialoja.app.data.Forma
-import com.acheialoja.app.data.LeitorMapa
-import com.acheialoja.app.data.Piso
-import com.acheialoja.app.data.Loja
-import com.acheialoja.app.data.Mapa
-import com.acheialoja.app.data.Ponto
+import androidx.core.net.toUri
+import com.acheialoja.app.data.Item
 import com.acheialoja.app.data.Repositorio
-import com.acheialoja.app.data.ResultadoRota
 import com.acheialoja.app.data.Rota
+import com.acheialoja.app.data.Shopping
 import com.acheialoja.app.data.nomeCategoria
 import com.acheialoja.app.data.nomePonto
 import com.acheialoja.app.data.normalizar
-import kotlinx.coroutines.Dispatchers
+import com.acheialoja.app.data.novoId
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.IndoorBuilding
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.RoundCap
+import com.google.maps.android.compose.CameraPositionState
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.IndoorStateChangeListener
+import com.google.maps.android.compose.MapEffect
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.MapsComposeExperimentalApi
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.Polyline
+import com.google.maps.android.compose.rememberCameraPositionState
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.google.android.gms.maps.GoogleMap as MapaGoogle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelaMapa(
     uid: String,
     shoppingId: String,
-    exemplo: Boolean,
+    @Suppress("UNUSED_PARAMETER") exemplo: Boolean,
     admin: Boolean,
     aoVoltar: () -> Unit,
 ) {
-    val contexto = LocalContext.current
-    var mapa by remember { mutableStateOf<Mapa?>(null) }
+    var shopping by remember { mutableStateOf<Shopping?>(null) }
     var erro by remember { mutableStateOf<String?>(null) }
     var tentativa by remember { mutableIntStateOf(0) }
+    val camera = rememberCameraPositionState()
 
     LaunchedEffect(shoppingId, tentativa) {
         erro = null
         try {
-            mapa = if (exemplo) {
-                withContext(Dispatchers.IO) {
-                    val texto = contexto.assets.open("exemplo.json").bufferedReader().use { it.readText() }
-                    LeitorMapa.ler(texto, "exemplo")
-                }
-            } else {
-                Repositorio.carregarMapa(shoppingId)
-            }
+            val s = Repositorio.carregarShopping(shoppingId)
+            camera.position = CameraPosition.fromLatLngZoom(LatLng(s.lat, s.lng), s.zoom)
+            shopping = s
         } catch (e: Exception) {
             erro = traduzirErro(e)
         }
@@ -123,14 +129,13 @@ fun TelaMapa(
     val escopo = rememberCoroutineScope()
     var editando by remember { mutableStateOf(false) }
     var mostrarDados by remember { mutableStateOf(false) }
-    val podeEditar = admin && !exemplo
 
     /** Aplica uma alteração do administrador e salva no Firebase. */
-    fun alterar(novo: Mapa) {
-        mapa = novo
+    fun alterar(novo: Shopping) {
+        shopping = novo
         escopo.launch {
             try {
-                Repositorio.salvarMapa(novo)
+                Repositorio.salvarShopping(novo)
             } catch (e: Exception) {
                 snackbar.showSnackbar("Não salvou: ${traduzirErro(e)}")
             }
@@ -143,12 +148,12 @@ fun TelaMapa(
                 title = {
                     Column {
                         Text(
-                            mapa?.nome ?: "Carregando…",
+                            shopping?.nome ?: "Carregando…",
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             fontWeight = FontWeight.Bold,
                         )
-                        mapa?.cidade?.takeIf { it.isNotBlank() }?.let {
+                        shopping?.cidade?.takeIf { it.isNotBlank() }?.let {
                             Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1)
                         }
                     }
@@ -159,25 +164,23 @@ fun TelaMapa(
                     }
                 },
                 actions = {
-                    if (podeEditar && mapa != null) {
+                    if (admin && shopping != null) {
                         IconButton(onClick = { editando = !editando }) {
                             Icon(
                                 if (editando) Icons.Filled.Check else Icons.Filled.Edit,
-                                contentDescription = if (editando) "Concluir edição" else "Editar mapa",
+                                contentDescription = if (editando) "Concluir edição" else "Editar marcações",
                                 tint = if (editando) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             )
                         }
                     }
-                    if (!exemplo) {
-                        IconButton(onClick = { Repositorio.alternarFavorito(uid, shoppingId, !favorito) }) {
-                            Icon(
-                                if (favorito) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                contentDescription = "Favoritar",
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        }
+                    IconButton(onClick = { Repositorio.alternarFavorito(uid, shoppingId, !favorito) }) {
+                        Icon(
+                            if (favorito) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            contentDescription = "Favoritar",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
                     }
-                    IconButton(onClick = { mostrarReporte = true }, enabled = mapa != null) {
+                    IconButton(onClick = { mostrarReporte = true }, enabled = shopping != null) {
                         Icon(Icons.Filled.Warning, contentDescription = "Informar erro no mapa")
                     }
                 },
@@ -190,20 +193,20 @@ fun TelaMapa(
                 .fillMaxSize()
                 .padding(pad)
         ) {
-            val m = mapa
+            val s = shopping
             when {
                 erro != null -> Column(
                     Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Mensagem("Não foi possível abrir o mapa.\n$erro")
+                    Mensagem("Não foi possível abrir o shopping.\n$erro")
                     TextButton(onClick = { tentativa++ }) { Text("Tentar de novo") }
                 }
-                m == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                m.pisos.isEmpty() -> Mensagem("Este shopping ainda não tem pisos desenhados.")
+                s == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 else -> ConteudoMapa(
-                    mapa = m,
+                    shopping = s,
+                    camera = camera,
                     editando = editando,
                     aoAlterar = { alterar(it) },
                     aoAbrirDados = { mostrarDados = true },
@@ -213,16 +216,18 @@ fun TelaMapa(
         }
     }
 
-    val m = mapa
-    if (mostrarDados && m != null) {
+    val s = shopping
+    if (mostrarDados && s != null) {
+        val pos = camera.position
         DialogoDadosShopping(
-            mapa = m,
+            shopping = s,
+            enquadramento = Enquadramento(pos.target.latitude, pos.target.longitude, pos.zoom),
             aoSalvar = { alterar(it); mostrarDados = false },
             aoExcluirShopping = {
                 mostrarDados = false
                 escopo.launch {
                     try {
-                        Repositorio.excluirShopping(m.id)
+                        Repositorio.excluirShopping(s.id)
                         aoVoltar()
                     } catch (e: Exception) {
                         snackbar.showSnackbar("Não excluiu: ${traduzirErro(e)}")
@@ -232,14 +237,14 @@ fun TelaMapa(
             aoFechar = { mostrarDados = false },
         )
     }
-    if (mostrarReporte && m != null) {
+    if (mostrarReporte && s != null) {
         DialogoReporte(
             aoFechar = { mostrarReporte = false },
             aoEnviar = { texto ->
                 mostrarReporte = false
                 escopo.launch {
                     try {
-                        Repositorio.enviarSugestao(m.id, texto)
+                        Repositorio.enviarSugestao(s.id, texto)
                         snackbar.showSnackbar("Obrigado! Vamos conferir e corrigir o mapa.")
                     } catch (e: Exception) {
                         snackbar.showSnackbar("Não foi possível enviar: ${traduzirErro(e)}")
@@ -250,122 +255,144 @@ fun TelaMapa(
     }
 }
 
+/** Nome curto do piso ativo no Google Maps ("1", "2", "T"...). */
+private fun nivelDe(b: IndoorBuilding): String? =
+    b.levels.getOrNull(b.activeLevelIndex)?.let { it.shortName?.ifBlank { null } ?: it.name }
+
+private fun mesmoPiso(a: String, b: String) = a.trim().equals(b.trim(), ignoreCase = true)
+
+@OptIn(MapsComposeExperimentalApi::class)
 @Composable
 private fun ConteudoMapa(
-    mapa: Mapa,
+    shopping: Shopping,
+    camera: CameraPositionState,
     editando: Boolean,
-    aoAlterar: (Mapa) -> Unit,
+    aoAlterar: (Shopping) -> Unit,
     aoAbrirDados: () -> Unit,
     aoConcluirEdicao: () -> Unit,
 ) {
-    val estado = remember(mapa.id) { EstadoMapa() }
-    var pisoIdx by remember(mapa.id) { mutableIntStateOf(0) }
-    var selecionada by remember(mapa.id) { mutableStateOf<Loja?>(null) }
-    var pontoDestacado by remember(mapa.id) { mutableStateOf<Ponto?>(null) }
-    var busca by remember(mapa.id) { mutableStateOf("") }
-    var mostrarLista by remember(mapa.id) { mutableStateOf(false) }
-    var avisoFechado by remember(mapa.id) { mutableStateOf(false) }
-    val idxPiso = pisoIdx.coerceIn(0, mapa.pisos.lastIndex)
-    val piso = mapa.pisos[idxPiso]
+    val contexto = LocalContext.current
+    val escopo = rememberCoroutineScope()
+    val densidade = LocalDensity.current.density
+
+    var selecionadoId by remember(shopping.id) { mutableStateOf<String?>(null) }
+    var busca by remember(shopping.id) { mutableStateOf("") }
+    var mostrarLista by remember(shopping.id) { mutableStateOf(false) }
+    var avisoFechado by remember(shopping.id) { mutableStateOf(false) }
+    var mapaGoogle by remember { mutableStateOf<MapaGoogle?>(null) }
+    var nivelAtual by remember { mutableStateOf<String?>(null) }
 
     // ----- Modo edição (administrador) -----
-    var alvo by remember(mapa.id) { mutableStateOf<AlvoEdicao?>(null) }
-    var movendo by remember(mapa.id) { mutableStateOf<AlvoEdicao?>(null) }
-    var mostrarAreas by remember(mapa.id) { mutableStateOf(false) }
-    val densidade = LocalDensity.current
+    var alvo by remember(shopping.id) { mutableStateOf<Pair<Item, Boolean>?>(null) } // item, é novo?
+    var adicionarEm by remember(shopping.id) { mutableStateOf<Pair<LatLng, String>?>(null) } // posição, nome sugerido
+    var movendo by remember(shopping.id) { mutableStateOf<Item?>(null) }
 
-    fun alterarPiso(f: (Piso) -> Piso) = aoAlterar(mapa.comPiso(idxPiso, f))
+    LaunchedEffect(editando) {
+        if (editando) selecionadoId = null else { movendo = null; adicionarEm = null }
+    }
 
-    // ----- Rota da entrada de motoboys até a loja escolhida -----
-    val lojaRota = if (editando) null else selecionada
-    val rota by produceState<ResultadoRota?>(null, lojaRota?.id, idxPiso, mapa) {
-        val l = lojaRota
-        value = if (l == null) null else withContext(Dispatchers.Default) {
-            try { Rota.calcular(mapa, idxPiso, l) } catch (e: Exception) { null }
+    val selecionado = shopping.itens.firstOrNull { it.id == selecionadoId }
+    val rota = remember(selecionado, shopping, editando) {
+        selecionado?.takeIf { it.eLoja && !editando }?.let { Rota.calcular(shopping, it) }
+    }
+
+    val ouvinteIndoor = remember {
+        object : IndoorStateChangeListener {
+            override fun onIndoorBuildingFocused() {
+                nivelAtual = mapaGoogle?.focusedBuilding?.let { nivelDe(it) }
+            }
+
+            override fun onIndoorLevelActivated(building: IndoorBuilding) {
+                nivelAtual = nivelDe(building)
+            }
         }
     }
-    LaunchedEffect(rota) {
-        val r = rota ?: return@LaunchedEffect
-        val xs = r.pontos.map { it.first }
-        val ys = r.pontos.map { it.second }
-        estado.enquadrarArea(mapa, xs.min(), ys.min(), xs.max(), ys.max())
+
+    /** Troca o seletor de piso do Google para o piso do item (se o prédio estiver em foco). */
+    fun ativarPiso(piso: String) {
+        if (piso.isBlank()) return
+        try {
+            val b = mapaGoogle?.focusedBuilding ?: return
+            b.levels.firstOrNull { mesmoPiso(it.shortName.orEmpty(), piso) || mesmoPiso(it.name.orEmpty(), piso) }
+                ?.activate()
+        } catch (_: Exception) {
+        }
     }
 
-    fun tocarEdicao(x: Float, y: Float) {
+    fun focar(item: Item) {
+        selecionadoId = item.id
+        busca = ""
+        mostrarLista = false
+        val r = if (item.eLoja) Rota.calcular(shopping, item) else null
+        escopo.launch {
+            try {
+                val alvoPos = LatLng(item.lat, item.lng)
+                if (r != null && r.metros > 5) {
+                    val limites = LatLngBounds.builder()
+                        .include(LatLng(r.origem.lat, r.origem.lng))
+                        .include(alvoPos)
+                        .build()
+                    camera.animate(CameraUpdateFactory.newLatLngBounds(limites, (90 * densidade).toInt()), 700)
+                    if (camera.position.zoom > 20f) camera.animate(CameraUpdateFactory.zoomTo(20f), 300)
+                } else {
+                    camera.animate(CameraUpdateFactory.newLatLngZoom(alvoPos, maxOf(camera.position.zoom, 19f)), 700)
+                }
+            } catch (_: Exception) {
+            }
+            ativarPiso(item.piso)
+        }
+    }
+
+    fun abrirNavegacao(lat: Double, lng: Double) {
+        val url = "https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=two-wheeler"
+        try {
+            contexto.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+        } catch (_: Exception) {
+        }
+    }
+
+    fun tocarNoMapa(pos: LatLng, nomeSugerido: String) {
+        if (!editando) {
+            selecionadoId = null
+            return
+        }
         val m = movendo
         if (m != null) {
             movendo = null
-            when (m) {
-                is AlvoEdicao.LojaAlvo -> alterarPiso { p ->
-                    p.copy(lojas = p.lojas.map { if (it.id == m.loja.id) it.copy(x = x - it.w / 2f, y = y - it.h / 2f) else it })
-                }
-                is AlvoEdicao.PontoAlvo -> alterarPiso { p ->
-                    p.copy(pontos = p.pontos.mapIndexed { i, pt -> if (i == m.indice) pt.copy(x = x, y = y) else pt })
-                }
-                is AlvoEdicao.FormaAlvo -> alterarPiso { p ->
-                    p.copy(formas = p.formas.mapIndexed { i, f -> if (i == m.indice) f.copy(x = x - f.w / 2f, y = y - f.h / 2f) else f })
-                }
-                is AlvoEdicao.Adicionar -> Unit
-            }
-            return
-        }
-        val escala = estado.base(mapa) * estado.escala
-        val raio = with(densidade) { 22.dp.toPx() } / escala
-        alvo = acertarEdicao(piso, x, y, raio)
-    }
-
-    fun adicionar(codigo: String, x: Float, y: Float) {
-        alvo = null
-        when {
-            codigo == "loja_comida" -> alvo = AlvoEdicao.LojaAlvo(
-                Loja(novoIdLoja(), "", "lanches", "", "", x - 30f, y - 20f, 60f, 40f), nova = true,
-            )
-            codigo == "loja_outra" -> alvo = AlvoEdicao.LojaAlvo(
-                Loja(novoIdLoja(), "", "outros", "", "", x - 40f, y - 25f, 80f, 50f), nova = true,
-            )
-            codigo.startsWith("area_") -> {
-                val tipo = codigo.removePrefix("area_")
-                val forma = when (tipo) {
-                    "corredor" -> Forma(tipo, x - 150f, y - 30f, 300f, 60f, "")
-                    "rua" -> Forma(tipo, x - 200f, y - 20f, 400f, 40f, "")
-                    "nome_rua" -> Forma(tipo, x - 120f, y - 15f, 240f, 30f, "Nome da rua")
-                    else -> Forma(tipo, x - 110f, y - 80f, 220f, 160f, if (tipo == "praca") "Praça de alimentação" else "")
-                }
-                alterarPiso { it.copy(formas = it.formas + forma) }
-                alvo = AlvoEdicao.FormaAlvo(piso.formas.size, forma)
-            }
-            else -> alterarPiso { it.copy(pontos = it.pontos + Ponto(codigo, x, y, nomePonto(codigo))) }
+            aoAlterar(shopping.copy(itens = shopping.itens.map {
+                if (it.id == m.id) it.copy(lat = pos.latitude, lng = pos.longitude) else it
+            }))
+        } else {
+            adicionarEm = pos to nomeSugerido
         }
     }
 
-    // Enquadra o shopping inteiro assim que a área do mapa tiver tamanho
-    LaunchedEffect(estado.tamanho) {
-        if (!estado.enquadrado && estado.tamanho != IntSize.Zero) estado.enquadrar(mapa)
-    }
-
-    fun irParaLoja(pisoDaLoja: Int, loja: Loja) {
-        pisoIdx = pisoDaLoja
-        selecionada = loja
-        pontoDestacado = null
-        busca = ""
-        mostrarLista = false
-        estado.focar(mapa, loja.x + loja.w / 2f, loja.y + loja.h / 2f)
-    }
-
-    fun irParaPonto(tipo: String) {
-        for ((i, p) in mapa.pisos.withIndex()) {
-            val ponto = p.pontos.firstOrNull { it.tipo == tipo } ?: continue
-            pisoIdx = i
-            selecionada = null
-            pontoDestacado = ponto
-            estado.focar(mapa, ponto.x, ponto.y, 2f)
-            return
+    fun adicionar(codigo: String, pos: LatLng, nomeSugerido: String) {
+        adicionarEm = null
+        val base = Item(
+            id = novoId(), tipo = "loja", nome = nomeSugerido, categoria = "lanches", numero = "", dica = "",
+            lat = pos.latitude, lng = pos.longitude, piso = nivelAtual.orEmpty(),
+        )
+        when (codigo) {
+            "loja_comida" -> alvo = base to true
+            "loja_outra" -> alvo = base.copy(categoria = "outros") to true
+            else -> aoAlterar(shopping.copy(itens = shopping.itens + base.copy(tipo = codigo, categoria = "", nome = "")))
         }
     }
 
-    val temEntradaMotoboy = mapa.pisos.any { p -> p.pontos.any { it.tipo == "entrada_motoboy" } }
-    val temRetirada = mapa.pisos.any { p -> p.pontos.any { it.tipo == "retirada" } }
-    val temVagasMotos = mapa.pisos.any { p -> p.pontos.any { it.tipo == "estacionamento" } }
+    fun primeiroDoTipo(tipo: String): Item? {
+        val todos = shopping.itens.filter { it.tipo == tipo }
+        return todos.firstOrNull { nivelAtual != null && mesmoPiso(it.piso, nivelAtual!!) } ?: todos.firstOrNull()
+    }
+
+    fun noPisoAtual(i: Item): Boolean {
+        val n = nivelAtual ?: return true
+        return i.piso.isBlank() || mesmoPiso(i.piso, n)
+    }
+
+    val entradaMotoboy = primeiroDoTipo("entrada_motoboy")
+    val vagas = primeiroDoTipo("estacionamento")
+    val retirada = primeiroDoTipo("retirada")
 
     Column(Modifier.fillMaxSize()) {
         // Busca de lojas
@@ -385,7 +412,7 @@ private fun ConteudoMapa(
                 .padding(horizontal = 12.dp, vertical = 4.dp),
         )
 
-        // Pisos e atalhos
+        // Atalhos
         Row(
             Modifier
                 .fillMaxWidth()
@@ -399,36 +426,14 @@ private fun ConteudoMapa(
                 onClick = { mostrarLista = !mostrarLista; busca = "" },
                 label = { Text("Lista de lojas") },
             )
-            if (mapa.pisos.size > 1) {
-                mapa.pisos.forEachIndexed { i, p ->
-                    FilterChip(
-                        selected = i == pisoIdx,
-                        onClick = { pisoIdx = i; pontoDestacado = null },
-                        label = { Text(p.nome) },
-                    )
-                }
+            entradaMotoboy?.let { e ->
+                AssistChip(onClick = { focar(e) }, label = { Text("Entrada motoboy") }, leadingIcon = { Bolinha(e.tipo) })
             }
-            if (temEntradaMotoboy) {
-                AssistChip(
-                    onClick = { irParaPonto("entrada_motoboy") },
-                    label = { Text("Entrada motoboy") },
-                    leadingIcon = { Bolinha("entrada_motoboy") },
-                )
+            vagas?.let { v ->
+                AssistChip(onClick = { focar(v) }, label = { Text("Vagas de motos") }, leadingIcon = { Bolinha(v.tipo) })
             }
-            if (temVagasMotos) {
-                AssistChip(
-                    onClick = { irParaPonto("estacionamento") },
-                    label = { Text("Vagas de motos") },
-                    leadingIcon = { Bolinha("estacionamento") },
-                )
-            }
-            if (temRetirada) {
-                AssistChip(
-                    onClick = { irParaPonto("retirada") },
-                    label = { Text("Retirada") },
-                    leadingIcon = { Bolinha("retirada") },
-                    colors = AssistChipDefaults.assistChipColors(),
-                )
+            retirada?.let { r ->
+                AssistChip(onClick = { focar(r) }, label = { Text("Retirada") }, leadingIcon = { Bolinha(r.tipo) })
             }
         }
 
@@ -439,8 +444,8 @@ private fun ConteudoMapa(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        if (movendo != null) "Toque no novo lugar do item"
-                        else "Editando: toque no mapa para adicionar ou alterar",
+                        if (movendo != null) "Toque no novo lugar de \"${movendo!!.titulo}\""
+                        else "Toque no mapa (ou no nome de uma loja do Google) para marcar. Piso: ${nivelAtual ?: "todos"}",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.weight(1f),
                     )
@@ -459,49 +464,79 @@ private fun ConteudoMapa(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            MapaInterativo(
-                mapa = mapa,
-                piso = piso,
-                estado = estado,
-                selecionada = selecionada,
-                pontoDestacado = pontoDestacado,
-                aoTocarLoja = { loja ->
-                    selecionada = loja
-                    pontoDestacado = null
-                },
-                aoTocarNoDesenho = if (editando) ({ x: Float, y: Float -> tocarEdicao(x, y) }) else null,
-                rota = rota?.pontos,
-            )
-
-            // Botões de zoom
-            Column(
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            val propriedades = remember { MapProperties(isIndoorEnabled = true, isBuildingEnabled = true) }
+            val controles = remember {
+                MapUiSettings(
+                    indoorLevelPickerEnabled = true,
+                    mapToolbarEnabled = false,
+                    myLocationButtonEnabled = false,
+                    tiltGesturesEnabled = false,
+                    zoomControlsEnabled = true,
+                )
+            }
+            GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = camera,
+                properties = propriedades,
+                uiSettings = controles,
+                indoorStateChangeListener = ouvinteIndoor,
+                onMapClick = { tocarNoMapa(it, "") },
+                onPOIClick = { poi -> tocarNoMapa(poi.latLng, if (editando) poi.name.orEmpty() else "") },
             ) {
-                SmallFloatingActionButton(onClick = { estado.zoomNoCentro(1.5f) }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Aproximar")
+                MapEffect(Unit) { mapa -> mapaGoogle = mapa }
+                val icones = remember(densidade) { IconesMapa(densidade) }
+
+                shopping.itens.forEach { item ->
+                    key(item.id, item.lat, item.lng) {
+                        val estado = remember { MarkerState(LatLng(item.lat, item.lng)) }
+                        val destaque = item.id == selecionadoId || item.id == movendo?.id
+                        val visivelNoPiso = noPisoAtual(item)
+                        Marker(
+                            state = estado,
+                            icon = icones.de(item, destaque),
+                            anchor = if (item.eLoja) Offset(0.5f, 1f) else Offset(0.5f, 0.5f),
+                            alpha = if (visivelNoPiso || destaque) 1f else 0.3f,
+                            zIndex = when {
+                                destaque -> 10f
+                                !visivelNoPiso -> 0f
+                                item.eLoja -> 2f
+                                else -> 3f
+                            },
+                            title = null,
+                            onClick = {
+                                if (editando) {
+                                    if (movendo == null) alvo = item to false
+                                } else {
+                                    focar(item)
+                                }
+                                true
+                            },
+                        )
+                    }
                 }
-                SmallFloatingActionButton(onClick = { estado.zoomNoCentro(1f / 1.5f) }) {
-                    Text("−", style = MaterialTheme.typography.titleLarge)
-                }
-                SmallFloatingActionButton(onClick = { estado.enquadrar(mapa) }) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "Ver shopping inteiro")
+
+                rota?.let { r ->
+                    Polyline(
+                        points = listOf(LatLng(r.origem.lat, r.origem.lng), LatLng(r.destino.lat, r.destino.lng)),
+                        color = COR_ROTA,
+                        width = 7f * densidade,
+                        startCap = RoundCap(),
+                        endCap = RoundCap(),
+                        zIndex = 5f,
+                    )
                 }
             }
 
             // Resultados da busca por cima do mapa
             val termo = normalizar(busca)
             if (termo.isNotEmpty() || mostrarLista) {
-                val resultados = mapa.pisos.withIndex().flatMap { (i, p) ->
-                    p.lojas
-                        .filter {
-                            if (termo.isEmpty()) it.eComida
-                            else normalizar(it.nome + " " + it.numero + " " + nomeCategoria(it.categoria)).contains(termo)
-                        }
-                        .map { i to it }
-                }.sortedWith(compareByDescending<Pair<Int, Loja>> { it.second.eComida }.thenBy { normalizar(it.second.nome) })
+                val resultados = shopping.itens
+                    .filter { it.eLoja }
+                    .filter {
+                        if (termo.isEmpty()) it.eComida
+                        else normalizar(it.nome + " " + it.numero + " " + nomeCategoria(it.categoria)).contains(termo)
+                    }
+                    .sortedWith(compareByDescending<Item> { it.eComida }.thenBy { normalizar(it.nome) })
 
                 ElevatedCard(
                     Modifier
@@ -511,31 +546,35 @@ private fun ConteudoMapa(
                         .heightIn(max = if (mostrarLista) 440.dp else 320.dp)
                 ) {
                     if (resultados.isEmpty()) {
-                        Text("Nenhuma loja encontrada.", Modifier.padding(16.dp))
+                        Text(
+                            if (shopping.itens.none { it.eLoja }) "Ainda não marcamos lojas neste shopping."
+                            else "Nenhuma loja encontrada.",
+                            Modifier.padding(16.dp),
+                        )
                     } else {
                         LazyColumn {
-                            items(resultados, key = { "${it.first}-${it.second.id}" }) { (i, loja) ->
+                            items(resultados, key = { it.id }) { loja ->
                                 Row(
                                     Modifier
                                         .fillMaxWidth()
-                                        .clickable { irParaLoja(i, loja) }
+                                        .clickable { focar(loja) }
                                         .padding(horizontal = 16.dp, vertical = 10.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Box(
                                         Modifier
                                             .size(16.dp)
-                                            .background(
-                                                grupoDaCategoria(loja.categoria)?.cor ?: Color(0xFFB5B9C0),
-                                                MaterialTheme.shapes.extraSmall,
-                                            )
+                                            .background(corDaLoja(loja.categoria), MaterialTheme.shapes.extraSmall)
                                     )
                                     Spacer(Modifier.width(12.dp))
                                     Column {
                                         Text(loja.nome, fontWeight = FontWeight.SemiBold)
                                         Text(
-                                            listOf(mapa.pisos[i].nome, loja.numero, nomeCategoria(loja.categoria))
-                                                .filter { it.isNotBlank() }.joinToString(" · "),
+                                            listOf(
+                                                loja.piso.takeIf { it.isNotBlank() }?.let { "Piso $it" }.orEmpty(),
+                                                loja.numero,
+                                                nomeCategoria(loja.categoria),
+                                            ).filter { it.isNotBlank() }.joinToString(" · "),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -550,87 +589,88 @@ private fun ConteudoMapa(
         }
 
         // Painel inferior
-        val loja = selecionada
-        val ponto = pontoDestacado
+        val item = selecionado
         when {
-            loja != null -> PainelInfo(
-                titulo = loja.nome,
+            item != null && item.eLoja -> PainelInfo(
+                titulo = item.nome,
                 linhas = listOfNotNull(
-                    listOf(piso.nome, loja.numero.takeIf { it.isNotBlank() }?.let { "Loja $it" }, nomeCategoria(loja.categoria))
-                        .filterNotNull().filter { it.isNotBlank() }.joinToString(" · "),
-                    loja.dica.takeIf { it.isNotBlank() }?.let { "Dica: $it" },
-                    rota?.let { it.aviso ?: "Linha azul: caminho a partir da entrada de motoboys." },
+                    listOf(
+                        item.piso.takeIf { it.isNotBlank() }?.let { "Piso $it" },
+                        item.numero.takeIf { it.isNotBlank() }?.let { "Loja $it" },
+                        nomeCategoria(item.categoria),
+                    ).filterNotNull().joinToString(" · "),
+                    item.dica.takeIf { it.isNotBlank() }?.let { "Dica: $it" },
+                    rota?.aviso ?: "A entrada de motoboys deste shopping ainda não foi marcada.",
                 ),
-                aoFechar = { selecionada = null },
+                acao = rota?.let { r -> "Ir de moto até a entrada" to { abrirNavegacao(r.origem.lat, r.origem.lng) } },
+                aoFechar = { selecionadoId = null },
             )
-            ponto != null -> PainelInfo(
-                titulo = ponto.rotulo.ifBlank { nomePonto(ponto.tipo) },
-                linhas = listOf(piso.nome),
-                aoFechar = { pontoDestacado = null },
+            item != null -> PainelInfo(
+                titulo = item.titulo,
+                linhas = listOfNotNull(
+                    item.piso.takeIf { it.isNotBlank() }?.let { "Piso $it" },
+                    item.dica.takeIf { it.isNotBlank() },
+                ),
+                acao = if (item.tipo in listOf("entrada_motoboy", "estacionamento", "entrada")) {
+                    "Ir de moto até aqui" to { abrirNavegacao(item.lat, item.lng) }
+                } else null,
+                aoFechar = { selecionadoId = null },
             )
-            mapa.observacoes.isNotBlank() && !avisoFechado -> PainelInfo(
+            editando -> Unit
+            shopping.observacoes.isNotBlank() && !avisoFechado -> PainelInfo(
                 titulo = "Aviso para motoboys",
-                linhas = listOf(mapa.observacoes),
+                linhas = listOf(shopping.observacoes),
+                aoFechar = { avisoFechado = true },
+            )
+            shopping.itens.isEmpty() && !avisoFechado -> PainelInfo(
+                titulo = "Em breve",
+                linhas = listOf("Ainda estamos marcando a entrada de motoboys e as lojas deste shopping. O mapa do Google já mostra o prédio."),
                 aoFechar = { avisoFechado = true },
             )
         }
-        Legenda(mapa)
+        Legenda(shopping)
     }
 
     // Diálogos do modo edição
-    when (val a = alvo) {
-        null -> Unit
-        is AlvoEdicao.Adicionar -> DialogoAdicionar(
-            aoEscolher = { adicionar(it, a.x, a.y) },
-            aoEditarAreas = { alvo = null; mostrarAreas = true },
-            aoFechar = { alvo = null },
-        )
-        is AlvoEdicao.LojaAlvo -> DialogoLoja(
-            loja = a.loja,
-            nova = a.nova,
-            aoSalvar = { nova ->
-                alterarPiso { p ->
-                    if (a.nova) p.copy(lojas = p.lojas + nova)
-                    else p.copy(lojas = p.lojas.map { if (it.id == nova.id) nova else it })
-                }
-                alvo = null
-            },
-            aoExcluir = { alterarPiso { p -> p.copy(lojas = p.lojas.filter { it.id != a.loja.id }) }; alvo = null },
-            aoMover = { movendo = a; alvo = null },
-            aoFechar = { alvo = null },
-        )
-        is AlvoEdicao.PontoAlvo -> DialogoPonto(
-            ponto = a.ponto,
-            aoSalvar = { novo ->
-                alterarPiso { p -> p.copy(pontos = p.pontos.mapIndexed { i, pt -> if (i == a.indice) novo else pt }) }
-                alvo = null
-            },
-            aoExcluir = { alterarPiso { p -> p.copy(pontos = p.pontos.filterIndexed { i, _ -> i != a.indice }) }; alvo = null },
-            aoMover = { movendo = a; alvo = null },
-            aoFechar = { alvo = null },
-        )
-        is AlvoEdicao.FormaAlvo -> DialogoForma(
-            forma = a.forma,
-            aoSalvar = { nova ->
-                alterarPiso { p -> p.copy(formas = p.formas.mapIndexed { i, f -> if (i == a.indice) nova else f }) }
-                alvo = null
-            },
-            aoExcluir = { alterarPiso { p -> p.copy(formas = p.formas.filterIndexed { i, _ -> i != a.indice }) }; alvo = null },
-            aoMover = { movendo = a; alvo = null },
-            aoFechar = { alvo = null },
+    adicionarEm?.let { (pos, nomeSugerido) ->
+        DialogoAdicionar(
+            piso = nivelAtual.orEmpty(),
+            aoEscolher = { adicionar(it, pos, nomeSugerido) },
+            aoFechar = { adicionarEm = null },
         )
     }
-    if (mostrarAreas) {
-        DialogoListaAreas(
-            piso = piso,
-            aoEscolher = { i -> mostrarAreas = false; alvo = AlvoEdicao.FormaAlvo(i, piso.formas[i]) },
-            aoFechar = { mostrarAreas = false },
-        )
+    alvo?.let { (a, nova) ->
+        key(a.id) {
+            DialogoItem(
+                item = a,
+                nova = nova,
+                aoSalvar = { novo ->
+                    aoAlterar(
+                        shopping.copy(
+                            itens = if (nova) shopping.itens + novo
+                            else shopping.itens.map { if (it.id == novo.id) novo else it }
+                        )
+                    )
+                    alvo = null
+                },
+                aoExcluir = {
+                    aoAlterar(shopping.copy(itens = shopping.itens.filter { it.id != a.id }))
+                    alvo = null
+                },
+                aoMover = { movendo = a; alvo = null },
+                aoFechar = { alvo = null },
+            )
+        }
     }
 }
 
 @Composable
-private fun PainelInfo(titulo: String, linhas: List<String>, aoFechar: (() -> Unit)?) {
+private fun PainelInfo(
+    titulo: String,
+    linhas: List<String>,
+    acao: Pair<String, () -> Unit>? = null,
+    aoFechar: (() -> Unit)?,
+) {
     Card(
         Modifier
             .fillMaxWidth()
@@ -640,7 +680,10 @@ private fun PainelInfo(titulo: String, linhas: List<String>, aoFechar: (() -> Un
         Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
             Column(Modifier.weight(1f)) {
                 Text(titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                linhas.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                linhas.filter { it.isNotBlank() }.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                if (acao != null) {
+                    Button(onClick = acao.second, modifier = Modifier.padding(top = 8.dp)) { Text(acao.first) }
+                }
             }
             if (aoFechar != null) {
                 IconButton(onClick = aoFechar) { Icon(Icons.Filled.Close, contentDescription = "Fechar") }
@@ -650,11 +693,12 @@ private fun PainelInfo(titulo: String, linhas: List<String>, aoFechar: (() -> Un
 }
 
 @Composable
-private fun Legenda(mapa: Mapa) {
-    val lojas = mapa.pisos.flatMap { it.lojas }
+private fun Legenda(shopping: Shopping) {
+    val lojas = shopping.itens.filter { it.eLoja }
     val grupos = lojas.mapNotNull { grupoDaCategoria(it.categoria) }.toSet()
     val temOutras = lojas.any { grupoDaCategoria(it.categoria) == null }
-    val tiposPonto = mapa.pisos.flatMap { p -> p.pontos.map { it.tipo } }.distinct()
+    val tiposPonto = shopping.itens.filter { !it.eLoja }.map { it.tipo }.distinct()
+    if (grupos.isEmpty() && !temOutras && tiposPonto.isEmpty()) return
     Row(
         Modifier
             .fillMaxWidth()
@@ -664,7 +708,7 @@ private fun Legenda(mapa: Mapa) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         GRUPOS_COMIDA.filter { it in grupos }.forEach { ItemLegenda(cor = it.cor, texto = it.nome) }
-        if (temOutras) ItemLegenda(cor = Color(0xFFB5B9C0), texto = "Outras lojas")
+        if (temOutras) ItemLegenda(cor = COR_OUTRAS_LOJAS, texto = "Outras lojas")
         tiposPonto.forEach { tipo ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Bolinha(tipo)
