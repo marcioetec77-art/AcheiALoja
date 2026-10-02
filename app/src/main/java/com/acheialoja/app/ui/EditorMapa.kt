@@ -256,6 +256,31 @@ fun DialogoDadosShopping(
     )
 }
 
+/** Administrador: corrige o nome e a cidade de um shopping direto da lista. */
+@Composable
+fun DialogoRenomearShopping(
+    shopping: com.acheialoja.app.data.ShoppingResumo,
+    aoSalvar: (nome: String, cidade: String) -> Unit,
+    aoFechar: () -> Unit,
+) {
+    var nome by remember { mutableStateOf(shopping.nome) }
+    var cidade by remember { mutableStateOf(shopping.cidade) }
+    AlertDialog(
+        onDismissRequest = aoFechar,
+        title = { Text("Editar shopping") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(nome, { nome = it.take(80) }, label = { Text("Nome") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(cidade, { cidade = it.take(80) }, label = { Text("Cidade / bairro") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = nome.isNotBlank(), onClick = { aoSalvar(nome.trim(), cidade.trim()) }) { Text("Salvar") }
+        },
+        dismissButton = { TextButton(onClick = aoFechar) { Text("Cancelar") } },
+    )
+}
+
 @Composable
 fun DialogoNovoShopping(
     sugestao: Boolean,

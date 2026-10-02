@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LocationOn
@@ -79,6 +80,7 @@ fun TelaShoppings(
     }
 
     var novoShopping by remember { mutableStateOf(false) }
+    var editandoNome by remember { mutableStateOf<ShoppingResumo?>(null) }
     var mostrarApoio by remember { mutableStateOf(false) }
     if (mostrarApoio) DialogoApoio(aoFechar = { mostrarApoio = false })
     var criando by remember { mutableStateOf(false) }
@@ -87,6 +89,24 @@ fun TelaShoppings(
     val snackbar = remember { SnackbarHostState() }
 
     val minhasPendentes = lista.orEmpty().count { !it.ativo && it.criadoPor == uid }
+
+    editandoNome?.let { alvo ->
+        DialogoRenomearShopping(
+            shopping = alvo,
+            aoSalvar = { nome, cidade ->
+                editandoNome = null
+                escopo.launch {
+                    try {
+                        Repositorio.renomearShopping(alvo.id, nome, cidade)
+                        snackbar.showSnackbar("Nome atualizado.")
+                    } catch (e: Exception) {
+                        snackbar.showSnackbar("Não salvou: ${traduzirErro(e)}")
+                    }
+                }
+            },
+            aoFechar = { editandoNome = null },
+        )
+    }
 
     if (novoShopping) {
         DialogoNovoShopping(
@@ -149,6 +169,17 @@ fun TelaShoppings(
                 .fillMaxSize()
                 .padding(pad)
         ) {
+            // Fica fixo no topo para não sumir quando a lista crescer
+            OutlinedButton(
+                onClick = { mostrarApoio = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 12.dp),
+            ) {
+                Icon(Icons.Filled.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text("Apoie o desenvolvedor")
+            }
             OutlinedTextField(
                 value = busca,
                 onValueChange = { busca = it },
@@ -157,7 +188,7 @@ fun TelaShoppings(
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
             )
 
             val atual = lista
@@ -213,18 +244,8 @@ fun TelaShoppings(
                                 aoFavoritar = {
                                     Repositorio.alternarFavorito(uid, s.id, s.id !in favoritos)
                                 },
+                                aoEditar = if (admin) ({ editandoNome = s }) else null,
                             )
-                        }
-                        item {
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedButton(
-                                onClick = { mostrarApoio = true },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Icon(Icons.Filled.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Apoie o desenvolvedor")
-                            }
                         }
                     }
                 }
@@ -239,6 +260,7 @@ private fun CartaoShopping(
     favorito: Boolean,
     aoClicar: () -> Unit,
     aoFavoritar: () -> Unit,
+    aoEditar: (() -> Unit)? = null,
 ) {
     Card(
         Modifier
@@ -270,6 +292,11 @@ private fun CartaoShopping(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+            if (aoEditar != null) {
+                IconButton(onClick = aoEditar) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Editar nome", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             IconButton(onClick = aoFavoritar) {

@@ -195,6 +195,13 @@ object Repositorio {
         return doc.id
     }
 
+    /** Administrador: corrige nome e cidade de um shopping. */
+    suspend fun renomearShopping(id: String, nome: String, cidade: String) {
+        db.collection("shoppings").document(id).update(
+            mapOf("nome" to nome.trim(), "cidade" to cidade.trim(), "atualizadoEm" to Timestamp.now())
+        ).await()
+    }
+
     /** Administrador: libera um shopping sugerido para todos verem. */
     suspend fun aprovarShopping(id: String) {
         db.collection("shoppings").document(id).update(
